@@ -4,9 +4,71 @@ import 'dart:ui';
 ///
 /// Every geometric value is a fraction of one *emulated* pixel rather than a
 /// count of screen pixels, so a style reads identically at any output size.
-class DisplayStyle {
+enum DisplayStyle {
+  trinitron(
+    label: 'Trinitron',
+    scanline: 0.34,
+    scanlineDepth: 0.67,
+    phosphor: true,
+    phosphorDepth: 0.78,
+  ),
+  pvm(
+    label: 'PVM 20',
+    scanline: 0.5,
+    scanlineDepth: 0.49,
+    phosphor: true,
+    phosphorDepth: 0.84,
+    tint: Color(0xfff8fff8),
+  ),
+  shadowMask(
+    label: 'Shadow Mask',
+    scanline: 0.34,
+    scanlineDepth: 0.65,
+    phosphor: true,
+    phosphorDepth: 0.76,
+    triad: true,
+    tint: Color(0xfffffcfa),
+  ),
+  arcade(
+    label: 'Arcade',
+    scanline: 0.4,
+    scanlineDepth: 0.41,
+    tint: Color(0xfff8ebff),
+  ),
+  horizontal(
+    label: 'Horizontal',
+    verticalStripe: 0.34,
+    verticalStripeDepth: 0.47,
+    tint: Color(0xfffffcf5),
+  ),
+  dotMatrix(
+    label: 'Dot Matrix',
+    pixelGap: 0.25,
+    pixelGapDepth: 0.43,
+    tint: Color(0xfffafaff),
+  ),
+  lcd(
+    label: 'LCD',
+    pixelGap: 0.18,
+    pixelGapDepth: 0.78,
+    tint: Color(0xffe8f2ff),
+  ),
+  oled(label: 'OLED', pixelGap: 0.22, pixelGapDepth: 0.57),
+  gameBoy(
+    label: 'Game Boy',
+    pixelGap: 0.2,
+    pixelGapDepth: 0.73,
+    tint: Color(0xff9bcd55),
+  ),
+  composite(
+    label: 'Composite',
+    scanline: 0.25,
+    scanlineDepth: 0.84,
+    tint: Color(0xfffffaf2),
+  );
+
   const DisplayStyle({
-    required this.name,
+    required this.label,
     this.scanline = 0,
     this.scanlineDepth = 1,
     this.verticalStripe = 0,
@@ -19,7 +81,7 @@ class DisplayStyle {
     this.triad = false,
   });
 
-  final String name;
+  final String label;
   final double scanline;
   final double scanlineDepth;
   final double verticalStripe;
@@ -31,93 +93,10 @@ class DisplayStyle {
   final bool phosphor;
   final bool triad;
 
-  static const trinitron = DisplayStyle(
-    name: 'Trinitron',
-    scanline: 0.34,
-    scanlineDepth: 0.67,
-    phosphor: true,
-    phosphorDepth: 0.78,
-  );
+  DisplayStyle get next => values[(index + 1) % values.length];
 
-  static const pvm = DisplayStyle(
-    name: 'PVM 20',
-    scanline: 0.5,
-    scanlineDepth: 0.49,
-    phosphor: true,
-    phosphorDepth: 0.84,
-    tint: Color(0xfff8fff8),
-  );
-
-  static const shadowMask = DisplayStyle(
-    name: 'Shadow Mask',
-    scanline: 0.34,
-    scanlineDepth: 0.65,
-    phosphor: true,
-    phosphorDepth: 0.76,
-    triad: true,
-    tint: Color(0xfffffcfa),
-  );
-
-  static const arcade = DisplayStyle(
-    name: 'Arcade',
-    scanline: 0.4,
-    scanlineDepth: 0.41,
-    tint: Color(0xfffff8eb),
-  );
-
-  static const horizontal = DisplayStyle(
-    name: 'Horizontal',
-    verticalStripe: 0.34,
-    verticalStripeDepth: 0.47,
-    tint: Color(0xfffffcf5),
-  );
-
-  static const dotMatrix = DisplayStyle(
-    name: 'Dot Matrix',
-    pixelGap: 0.25,
-    pixelGapDepth: 0.43,
-    tint: Color(0xfffafaff),
-  );
-
-  static const lcd = DisplayStyle(
-    name: 'LCD',
-    pixelGap: 0.18,
-    pixelGapDepth: 0.78,
-    tint: Color(0xffe8f2ff),
-  );
-
-  static const oled = DisplayStyle(
-    name: 'OLED',
-    pixelGap: 0.22,
-    pixelGapDepth: 0.57,
-  );
-
-  static const gameBoy = DisplayStyle(
-    name: 'Game Boy',
-    pixelGap: 0.2,
-    pixelGapDepth: 0.73,
-    tint: Color(0xff9bcd55),
-  );
-
-  static const composite = DisplayStyle(
-    name: 'Composite',
-    scanline: 0.25,
-    scanlineDepth: 0.84,
-    tint: Color(0xfffffaf2),
-  );
-
-  static const all = <DisplayStyle>[
-    trinitron,
-    pvm,
-    shadowMask,
-    arcade,
-    horizontal,
-    dotMatrix,
-    lcd,
-    oled,
-    gameBoy,
-    composite,
-  ];
+  DisplayStyle get previous =>
+      values[(index - 1 + values.length) % values.length];
 
   /// Multiplier for the output pixel at [fx], [fy] within the emulated pixel on
   /// row [row]. Returned channels are in 0..1 and only ever darken.
