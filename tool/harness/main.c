@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../../src/libretro_host.h"
+#include "libretro_host.h"
 #include "font.h"
 #include "styles.h"
 

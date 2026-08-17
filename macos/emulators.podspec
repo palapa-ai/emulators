@@ -7,7 +7,8 @@ Pod::Spec.new do |s|
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Palapa' => 'saad@palapa.ai' }
   s.source           = { :path => '.' }
-  s.source_files     = 'Classes/**/*', '../src/*.{c,h}'
+  s.source_files     = 'emulators/Sources/emulators/**/*.{c,h}'
+  s.public_header_files = 'emulators/Sources/emulators/include/*.h'
   s.dependency         'FlutterMacOS'
   s.platform         = :osx, '11.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
