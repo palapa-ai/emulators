@@ -10,10 +10,12 @@ one exercised so far is `snes9x2010` (SNES).
 ## Layout
 
 ```
-macos/emulators/Sources/emulators/  libretro_host.[ch] — the native host, no windowing
-lib/src/             Emulator, DisplayStyle, FFI bindings
-tool/harness/        SDL desktop harness: run a ROM without a Flutter host
-macos/, ios/         podspecs (ffiPlugin)
+macos/emulators/Sources/emulators/  libretro_host.[ch] — the native host
+lib/src/             Emulator, EmulatorSession, RomLibrary, FFI bindings
+lib/src/ui/          EmulatorScreen and the skin that draws it
+example/             runs the package on its own
+tool/harness/        SDL harness: run a ROM with no Flutter at all
+macos/, ios/         Package.swift + podspec (ffiPlugin)
 ```
 
 ## Using it
@@ -37,6 +39,30 @@ overwrites. Copy it if it needs to outlive the frame.
 **One session per process.** libretro cores keep their state in globals and
 take their callbacks as global function pointers, so a second `Emulator.open`
 throws while one is alive. That is a property of libretro, not of this package.
+
+## The screen
+
+`EmulatorScreen` is the whole feature — the running game over the shelf it came
+from. It draws with `package:flutter/widgets.dart` only: plain text and taps,
+no design system, so it runs on its own.
+
+```dart
+EmulatorScreen(corePath: corePath)
+```
+
+A host restyles it by subclassing `EmulatorSkin` and wrapping the screen —
+nothing about the host's design system reaches the package:
+
+```dart
+EmulatorTheme(
+  skin: const MySkin(),          // override text/button/cartridge
+  child: EmulatorScreen(corePath: corePath),
+)
+```
+
+`EmulatorScreenState.addFiles` and `.refresh` let a host add cartridges its own
+way — a drop target, a file picker — without the package taking on those
+dependencies.
 
 ## Display styles
 
