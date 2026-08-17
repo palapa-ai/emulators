@@ -10,7 +10,7 @@ one exercised so far is `snes9x2010` (SNES).
 ## Layout
 
 ```
-src/                 libretro_host.[ch] — the native host, no windowing
+macos/emulators/Sources/emulators/  libretro_host.[ch] — the native host, no windowing
 lib/src/             Emulator, DisplayStyle, FFI bindings
 tool/harness/        SDL desktop harness: run a ROM without a Flutter host
 macos/, ios/         podspecs (ffiPlugin)
