@@ -60,6 +60,12 @@ class Emulator {
 
   void reset() => _bindings.reset(_session);
 
+  bool startAudio() => _bindings.audioStart(_session) == 0;
+
+  void stopAudio() => _bindings.audioStop(_session);
+
+  int get queuedAudioFrames => _bindings.audioQueued(_session);
+
   void setButton(EmulatorButton button, {required bool pressed}) =>
       _bindings.setButton(_session, button.id, pressed ? 1 : 0);
 
