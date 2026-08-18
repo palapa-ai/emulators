@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/widgets.dart';
 
 import '../display_style.dart';
@@ -20,14 +22,45 @@ class StyleOverlay extends StatelessWidget {
   final int sourceHeight;
   final Widget child;
 
+  /// Whichever axis reduces more decides the scale, so one of them lands
+  /// exactly on the console's resolution and the picture keeps its shape.
+  double get _shrink {
+    final s = style;
+    if (s == null || s.nativeWidth <= 0 || s.nativeHeight <= 0) return 1;
+    return (s.nativeWidth / sourceWidth) < (s.nativeHeight / sourceHeight)
+        ? s.nativeWidth / sourceWidth
+        : s.nativeHeight / sourceHeight;
+  }
+
   @override
   Widget build(BuildContext context) {
     final style = this.style;
     if (style == null || sourceWidth <= 0 || sourceHeight <= 0) return child;
+    if (style.shader) return child;
+
+    final native = style.nativeWidth > 0 && style.nativeHeight > 0
+        ? ImageFiltered(
+            imageFilter: ImageFilter.compose(
+              // Down then up with nearest sampling: the detail is genuinely
+              // gone, which is what the smaller console actually looked like.
+              outer: ImageFilter.matrix(
+                (Matrix4.identity()..scaleByDouble(1 / _shrink, 1 / _shrink, 1, 1))
+                    .storage,
+                filterQuality: FilterQuality.none,
+              ),
+              inner: ImageFilter.matrix(
+                (Matrix4.identity()..scaleByDouble(_shrink, _shrink, 1, 1))
+                    .storage,
+                filterQuality: FilterQuality.none,
+              ),
+            ),
+            child: child,
+          )
+        : child;
 
     return CustomPaint(
       foregroundPainter: _StylePainter(style, sourceWidth, sourceHeight),
-      child: child,
+      child: native,
     );
   }
 }
