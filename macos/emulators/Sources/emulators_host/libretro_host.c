@@ -14,7 +14,7 @@
    click, short enough that input does not lag behind the picture. */
 #define AUDIO_RING_FRAMES 8192
 #define AUDIO_BUFFER_FRAMES 512
-#define AUDIO_BUFFER_COUNT 3
+#define AUDIO_BUFFER_COUNT 4
 
 struct EmuSession {
    void *lib;
@@ -49,6 +49,7 @@ struct EmuSession {
    int audio_read, audio_write;
    pthread_mutex_t audio_lock;
    AudioQueueRef audio_queue;
+   int audio_muted;
 
    int16_t buttons[EMU_BUTTON_COUNT];
 
@@ -233,6 +234,9 @@ static void audio_callback(void *user, AudioQueueRef queue,
    if (got < AUDIO_BUFFER_FRAMES)
       memset(out + (size_t)got * 2, 0,
             (size_t)(AUDIO_BUFFER_FRAMES - got) * 4);
+
+   if (s->audio_muted)
+      memset(out, 0, AUDIO_BUFFER_FRAMES * 4);
 
    buffer->mAudioDataByteSize = AUDIO_BUFFER_FRAMES * 4;
    AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);
@@ -442,6 +446,17 @@ int emu_audio_queued(EmuSession *s)
    int filled = ring_filled(s);
    pthread_mutex_unlock(&s->audio_lock);
    return filled;
+}
+
+void emu_audio_set_muted(EmuSession *s, int muted)
+{
+   if (s)
+      s->audio_muted = muted ? 1 : 0;
+}
+
+int emu_audio_muted(EmuSession *s)
+{
+   return s ? s->audio_muted : 0;
 }
 
 int emu_audio_start(EmuSession *s)

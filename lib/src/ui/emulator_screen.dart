@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import 'emulator_skin.dart';
+import 'style_overlay.dart';
 import 'emulator_view_model.dart';
 
 final _keyBindings = <LogicalKeyboardKey, EmulatorButton>{
@@ -142,7 +143,12 @@ class _Stage extends StatelessWidget {
                 aspectRatio: session.aspectRatio,
                 child: session.frame == null
                     ? const SizedBox.expand()
-                    : RawImage(image: session.frame, fit: .contain),
+                    : StyleOverlay(
+                        style: viewModel.style,
+                        sourceWidth: session.frame?.width ?? 0,
+                        sourceHeight: session.frame?.height ?? 0,
+                        child: RawImage(image: session.frame, fit: .contain),
+                      ),
               ),
             ),
           ),
@@ -161,9 +167,44 @@ class _Stage extends StatelessWidget {
             if (onPairController != null) const SizedBox(width: 8),
             skin.button(
               context,
+              label: 'Save',
+              icon: .save,
+              onTap: viewModel.saveState,
+            ),
+            const SizedBox(width: 8),
+            skin.button(
+              context,
+              label: 'Load',
+              icon: .load,
+              onTap: viewModel.loadState,
+            ),
+            const SizedBox(width: 8),
+            skin.button(
+              context,
+              label: viewModel.style?.label ?? 'Raw',
+              icon: .display,
+              onTap: viewModel.cycleStyle,
+            ),
+            const SizedBox(width: 8),
+            skin.button(
+              context,
+              label: viewModel.isMuted ? 'Unmute' : 'Mute',
+              icon: viewModel.isMuted ? .muted : .sound,
+              onTap: viewModel.toggleMuted,
+            ),
+            const SizedBox(width: 8),
+            skin.button(
+              context,
               label: viewModel.isPaused ? 'Resume' : 'Pause',
               icon: viewModel.isPaused ? .play : .pause,
               onTap: viewModel.togglePause,
+            ),
+            const SizedBox(width: 8),
+            skin.button(
+              context,
+              label: viewModel.speed.label,
+              icon: .speed,
+              onTap: viewModel.cycleSpeed,
             ),
             const SizedBox(width: 8),
             skin.button(

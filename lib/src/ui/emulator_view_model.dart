@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
 import '../core_library.dart';
 import '../emulator_button.dart';
+import '../display_style.dart';
 import '../emulator_session.dart';
 import '../rom_file.dart';
 import '../rom_library.dart';
@@ -38,7 +40,24 @@ class EmulatorViewModel extends ChangeNotifier {
 
   RomFile? get playing => session.rom;
   bool get isPaused => session.isPaused;
+  bool get isMuted => session.isMuted;
+  EmulatorSpeed get speed => session.speed;
   List<String> get logLines => session.logLines;
+
+  /// null is the raw picture; cycling walks the styles and returns to it.
+  DisplayStyle? _style;
+  DisplayStyle? get style => _style;
+
+  void cycleStyle() {
+    final current = _style;
+    _style = current == null
+        ? DisplayStyle.values.first
+        : (current.index == DisplayStyle.values.length - 1
+              ? null
+              : DisplayStyle.values[current.index + 1]);
+    session.log('display ${_style?.label ?? 'raw'}');
+    notifyListeners();
+  }
   List<EmulatorButton> get buttonLog => session.buttonLog;
   bool get hasGamepad => session.hasGamepad;
   String? get gamepadName => session.gamepadName;
@@ -89,6 +108,28 @@ class EmulatorViewModel extends ChangeNotifier {
   void pause() => session.pause();
   void resume() => session.resume();
   void togglePause() => session.isPaused ? session.resume() : session.pause();
+  void toggleMuted() => session.toggleMuted();
+  void cycleSpeed() => session.cycleSpeed();
+
+  /// One slot per cartridge, kept beside it on disk.
+  Future<void> saveState() async {
+    final rom = session.rom;
+    final state = session.saveState();
+    if (rom == null || state == null) return;
+    await File('${rom.path}.state').writeAsBytes(state);
+  }
+
+  Future<void> loadState() async {
+    final rom = session.rom;
+    if (rom == null) return;
+
+    final file = File('${rom.path}.state');
+    if (!file.existsSync()) {
+      session.log('no saved state');
+      return;
+    }
+    session.loadState(await file.readAsBytes());
+  }
   void stop() => session.stop();
   void reset() => session.reset();
 

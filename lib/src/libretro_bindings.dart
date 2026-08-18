@@ -53,6 +53,8 @@ typedef EmuSramData = Pointer<Void> Function(Pointer<EmuSession>);
 
 typedef _IntFromSessionNative = Int Function(Pointer<EmuSession>);
 typedef EmuIntFromSession = int Function(Pointer<EmuSession>);
+typedef _SetMutedNative = Void Function(Pointer<EmuSession>, Int);
+typedef EmuSetMuted = void Function(Pointer<EmuSession>, int);
 
 /// Thin `dart:ffi` surface over `src/libretro_host.c`. Holds no policy — the
 /// decisions live in [Emulator].
@@ -122,6 +124,13 @@ class LibretroBindings {
       audioQueued = lib
           .lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
             'emu_audio_queued',
+          ),
+      audioSetMuted = lib.lookupFunction<_SetMutedNative, EmuSetMuted>(
+        'emu_audio_set_muted',
+      ),
+      audioMuted = lib
+          .lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
+            'emu_audio_muted',
           );
 
   /// Apple builds link the plugin statically into the app binary, so the
@@ -156,4 +165,6 @@ class LibretroBindings {
   final EmuIntFromSession audioStart;
   final EmuVoidSession audioStop;
   final EmuIntFromSession audioQueued;
+  final EmuSetMuted audioSetMuted;
+  final EmuIntFromSession audioMuted;
 }

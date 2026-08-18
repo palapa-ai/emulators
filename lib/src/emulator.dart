@@ -66,6 +66,11 @@ class Emulator {
 
   int get queuedAudioFrames => _bindings.audioQueued(_session);
 
+  bool get isAudioMuted => _bindings.audioMuted(_session) != 0;
+
+  void setAudioMuted({required bool muted}) =>
+      _bindings.audioSetMuted(_session, muted ? 1 : 0);
+
   void setButton(EmulatorButton button, {required bool pressed}) =>
       _bindings.setButton(_session, button.id, pressed ? 1 : 0);
 

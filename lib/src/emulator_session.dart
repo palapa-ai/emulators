@@ -12,6 +12,17 @@ import 'rom_file.dart';
 /// bundled for this platform, which a host still has to be able to render.
 enum SessionStatus { idle, running, unavailable, failed }
 
+enum EmulatorSpeed {
+  half(0.5, '1/2'),
+  normal(1, '1x'),
+  fast(2, '2x');
+
+  const EmulatorSpeed(this.rate, this.label);
+
+  final double rate;
+  final String label;
+}
+
 /// A running game, driven a frame at a time and published as decoded images.
 ///
 /// libretro cores hold their state in globals, so one session exists at a
@@ -53,14 +64,16 @@ class EmulatorSession extends ChangeNotifier {
   bool get hasGamepad => _gamepad.isConnected;
   String? get gamepadName => _gamepad.name;
 
-  /// Roughly three frames of sound in hand — enough to ride out a slow decode,
-  /// short enough that a button press is not heard late.
+  /// Six frames of sound in hand. Three left no slack — a single slow frame
+  /// decode starved the device and the sound dropped out.
   int get _targetBacklogFrames =>
-      ((_emulator?.sampleRate ?? 32040) / (_emulator?.framesPerSecond ?? 60) * 3)
+      ((_emulator?.sampleRate ?? 32040) / (_emulator?.framesPerSecond ?? 60) * 6)
           .round();
 
   SessionStatus _status = SessionStatus.idle;
   bool _paused = false;
+  EmulatorSpeed _speed = EmulatorSpeed.normal;
+  final _clock = Stopwatch();
   RomFile? _rom;
   ui.Image? _frame;
   String? _error;
@@ -71,6 +84,22 @@ class EmulatorSession extends ChangeNotifier {
   String? get error => _error;
   bool get isRunning => _emulator != null;
   bool get isPaused => _paused;
+  EmulatorSpeed get speed => _speed;
+
+  /// Off 1x the audio device can no longer be the clock — it drains at one
+  /// rate only — so wall time takes over and the sound is muted to avoid
+  /// playing back at the wrong pitch.
+  void cycleSpeed() {
+    final next =
+        EmulatorSpeed.values[(_speed.index + 1) % EmulatorSpeed.values.length];
+    _speed = next;
+    _emulator?.setAudioMuted(muted: next != EmulatorSpeed.normal);
+    _clock
+      ..reset()
+      ..start();
+    log('speed ${next.label}');
+    notifyListeners();
+  }
   double get aspectRatio => _emulator?.aspectRatio ?? 4 / 3;
   String get coreName => _emulator?.coreName ?? '';
 
@@ -92,7 +121,7 @@ class EmulatorSession extends ChangeNotifier {
       _rom = rom;
       _error = null;
       _paused = false;
-      log('loaded ${rom.title}');
+      log('loaded ${rom.title} (${rom.path})');
       log('core ${_emulator?.coreName} ${_emulator?.coreVersion}');
     } on Object catch (e) {
       _emulator = null;
@@ -145,6 +174,28 @@ class EmulatorSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get isMuted => _emulator?.isAudioMuted ?? false;
+
+  void toggleMuted() {
+    final emulator = _emulator;
+    if (emulator == null) return;
+    emulator.setAudioMuted(muted: !emulator.isAudioMuted);
+    log(emulator.isAudioMuted ? 'audio muted' : 'audio on');
+    notifyListeners();
+  }
+
+  Uint8List? saveState() {
+    final state = _emulator?.saveState();
+    log(state == null ? 'save failed' : 'saved ${state.length} bytes');
+    return state;
+  }
+
+  bool loadState(Uint8List state) {
+    final ok = _emulator?.loadState(state) ?? false;
+    log(ok ? 'loaded state' : 'load failed');
+    return ok;
+  }
+
   void reset() {
     _emulator?.reset();
     log('reset');
@@ -183,7 +234,16 @@ class EmulatorSession extends ChangeNotifier {
   Future<void> _tick() async {
     final emulator = _emulator;
     if (emulator == null || _decoding || _paused) return;
-    if (emulator.queuedAudioFrames >= _targetBacklogFrames) return;
+
+    if (_speed == EmulatorSpeed.normal) {
+      if (emulator.queuedAudioFrames >= _targetBacklogFrames) return;
+    } else {
+      final due = 1000 / (emulator.framesPerSecond * _speed.rate);
+      if (_clock.elapsedMilliseconds < due) return;
+      _clock
+        ..reset()
+        ..start();
+    }
 
     _decoding = true;
     try {
