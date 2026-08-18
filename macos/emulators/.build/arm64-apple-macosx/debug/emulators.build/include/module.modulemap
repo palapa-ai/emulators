@@ -1,3 +1,0 @@
-module emulators {
-    header "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/emulators.build/include/emulators-Swift.h"
-}
