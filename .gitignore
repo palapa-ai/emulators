@@ -6,3 +6,5 @@ tool/harness/harness
 *.dylib
 .build/
 .swiftpm/
+example/.flutter-plugins-dependencies
+example/build/
