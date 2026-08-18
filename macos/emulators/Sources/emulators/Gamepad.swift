@@ -20,14 +20,24 @@ public func emu_gamepad_buttons() -> UInt32 {
   }
 
   if let pad = controller.extendedGamepad {
-    hold(.b, pad.buttonA.isPressed)
-    hold(.a, pad.buttonB.isPressed)
-    hold(.y, pad.buttonX.isPressed)
-    hold(.x, pad.buttonY.isPressed)
+    // A SNES pad labels its buttons the SNES way, so the names line up
+    // one-to-one — reading them positionally (bottom = B) is what put A on Y.
+    hold(.a, pad.buttonA.isPressed)
+    hold(.b, pad.buttonB.isPressed)
+    hold(.x, pad.buttonX.isPressed)
+    hold(.y, pad.buttonY.isPressed)
     hold(.l, pad.leftShoulder.isPressed)
     hold(.r, pad.rightShoulder.isPressed)
-    hold(.start, pad.buttonMenu.isPressed)
-    hold(.select, pad.buttonOptions?.isPressed ?? false)
+    // Retro pads put Select and Start wherever they like; accept every slot
+    // they plausibly land on rather than guess one.
+    hold(
+      .start,
+      pad.buttonMenu.isPressed || pad.rightTrigger.isPressed
+        || (pad.rightThumbstickButton?.isPressed ?? false))
+    hold(
+      .select,
+      (pad.buttonOptions?.isPressed ?? false) || pad.leftTrigger.isPressed
+        || (pad.leftThumbstickButton?.isPressed ?? false))
     hold(.up, pad.dpad.up.isPressed)
     hold(.down, pad.dpad.down.isPressed)
     hold(.left, pad.dpad.left.isPressed)
@@ -38,16 +48,72 @@ public func emu_gamepad_buttons() -> UInt32 {
   // Retro pads often expose only the legacy profile, which has no menu or
   // options button — Start and Select ride the shoulders there instead.
   if let pad = controller.gamepad {
-    hold(.b, pad.buttonA.isPressed)
-    hold(.a, pad.buttonB.isPressed)
-    hold(.y, pad.buttonX.isPressed)
-    hold(.x, pad.buttonY.isPressed)
+    hold(.a, pad.buttonA.isPressed)
+    hold(.b, pad.buttonB.isPressed)
+    hold(.x, pad.buttonX.isPressed)
+    hold(.y, pad.buttonY.isPressed)
     hold(.select, pad.leftShoulder.isPressed)
     hold(.start, pad.rightShoulder.isPressed)
     hold(.up, pad.dpad.up.isPressed)
     hold(.down, pad.dpad.down.isPressed)
     hold(.left, pad.dpad.left.isPressed)
     hold(.right, pad.dpad.right.isPressed)
+  }
+
+  return mask
+}
+
+/// Bit order matches PadElement on the Dart side. Raw physical elements, not
+/// the SNES mapping — this is what a remapping UI has to show.
+@_cdecl("emu_gamepad_raw")
+public func emu_gamepad_raw() -> UInt32 {
+  guard let controller = GCController.controllers().first else { return 0 }
+
+  var mask: UInt32 = 0
+  var bit: UInt32 = 0
+
+  func hold(_ pressed: Bool) {
+    if pressed { mask |= 1 << bit }
+    bit += 1
+  }
+
+  if let pad = controller.extendedGamepad {
+    hold(pad.buttonA.isPressed)
+    hold(pad.buttonB.isPressed)
+    hold(pad.buttonX.isPressed)
+    hold(pad.buttonY.isPressed)
+    hold(pad.leftShoulder.isPressed)
+    hold(pad.rightShoulder.isPressed)
+    hold(pad.leftTrigger.isPressed)
+    hold(pad.rightTrigger.isPressed)
+    hold(pad.buttonMenu.isPressed)
+    hold(pad.buttonOptions?.isPressed ?? false)
+    hold(false) // home needs macOS 11; the slot stays so bit order holds
+    hold(pad.dpad.up.isPressed)
+    hold(pad.dpad.down.isPressed)
+    hold(pad.dpad.left.isPressed)
+    hold(pad.dpad.right.isPressed)
+    hold(pad.leftThumbstickButton?.isPressed ?? false)
+    hold(pad.rightThumbstickButton?.isPressed ?? false)
+    return mask
+  }
+
+  if let pad = controller.gamepad {
+    hold(pad.buttonA.isPressed)
+    hold(pad.buttonB.isPressed)
+    hold(pad.buttonX.isPressed)
+    hold(pad.buttonY.isPressed)
+    hold(pad.leftShoulder.isPressed)
+    hold(pad.rightShoulder.isPressed)
+    hold(false)
+    hold(false)
+    hold(false)
+    hold(false)
+    hold(false)
+    hold(pad.dpad.up.isPressed)
+    hold(pad.dpad.down.isPressed)
+    hold(pad.dpad.left.isPressed)
+    hold(pad.dpad.right.isPressed)
   }
 
   return mask

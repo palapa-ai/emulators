@@ -44,6 +44,14 @@ EMU_API int emu_audio_read(EmuSession *s, int16_t *out, int max_frames);
 /* Silences output without stopping the clock — pacing still depends on the
    device draining, so muting must not pause the queue. */
 EMU_API void emu_audio_set_muted(EmuSession *s, int muted);
+
+/* Quantises to `bits` and optionally folds to mono, for looks that were also
+   a piece of hardware. 16 and 0 is untouched. */
+EMU_API void emu_audio_set_quality(EmuSession *s, int bits, int mono);
+
+/* Throws samples away instead of queueing them. Off-speed play generates far
+   more than the device can take, and the overflow is audible as static. */
+EMU_API void emu_audio_set_discard(EmuSession *s, int discard);
 EMU_API int emu_audio_muted(EmuSession *s);
 
 /* Plays the core's output through the system device; 0 on success. */
@@ -57,6 +65,9 @@ EMU_API int emu_audio_queued(EmuSession *s);
 
 EMU_API void emu_set_button(EmuSession *s, int button, int pressed);
 EMU_API void emu_reset(EmuSession *s);
+
+/* The value most recently handed to the core, for checking the wiring. */
+EMU_API int emu_last_input_mask(EmuSession *s);
 
 EMU_API double emu_fps(EmuSession *s);
 EMU_API double emu_sample_rate(EmuSession *s);
