@@ -12,14 +12,22 @@ import '../rom_library.dart';
 /// lookup and the emulation itself live in [RomLibrary], [CoreLibrary] and
 /// [EmulatorSession] — this only forwards.
 class EmulatorViewModel extends ChangeNotifier {
-  EmulatorViewModel({String? corePath, String? libraryRoot})
-    : _library = RomLibrary(rootPath: libraryRoot),
-      _cores = CoreLibrary(rootPath: libraryRoot),
-      session = EmulatorSession(corePath: corePath) {
+  EmulatorViewModel({
+    String? corePath,
+    String? libraryRoot,
+    this.autoPlay = false,
+  }) : _library = RomLibrary(rootPath: libraryRoot),
+       _cores = CoreLibrary(rootPath: libraryRoot),
+       session = EmulatorSession(corePath: corePath) {
     session.addListener(notifyListeners);
     unawaited(refresh());
     if (corePath == null) unawaited(_findCore());
   }
+
+  /// Start the first cartridge as soon as both it and a core are known —
+  /// for hosts that open straight into a game rather than the shelf.
+  final bool autoPlay;
+  bool _autoPlayed = false;
 
   final RomLibrary _library;
   final CoreLibrary _cores;
@@ -33,12 +41,22 @@ class EmulatorViewModel extends ChangeNotifier {
 
   Future<void> _findCore() async {
     session.corePath = await _cores.first();
+    _maybeAutoPlay();
     notifyListeners();
   }
 
   Future<void> refresh() async {
     _roms = await _library.load();
+    _maybeAutoPlay();
     notifyListeners();
+  }
+
+  void _maybeAutoPlay() {
+    if (!autoPlay || _autoPlayed) return;
+    if (session.corePath == null || _roms.isEmpty) return;
+
+    _autoPlayed = true;
+    session.play(_roms.first);
   }
 
   Future<void> addFiles(Iterable<String> paths) async {
