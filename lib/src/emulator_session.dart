@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'emulator.dart';
 import 'emulator_button.dart';
 import 'gamepad.dart';
-import 'pad_input.dart';
 import 'pad_element.dart';
 import 'rom_file.dart';
 
@@ -50,7 +49,6 @@ class EmulatorSession extends ChangeNotifier {
   bool _decoding = false;
 
   final _gamepad = Gamepad.open();
-  final _pad = PadInput();
   final _log = <String>[];
   final _buttonLog = <EmulatorButton>[];
   final _padLog = <PadElement>[];
@@ -266,12 +264,12 @@ class EmulatorSession extends ChangeNotifier {
   int _held = 0;
 
   int get heldMask => _held;
-  int get padMask => _gamepad.pressed | _pad.pressed;
-  List<String> get padKeys => _pad.seenKeys;
+  int get padMask => _gamepad.pressed;
+  String? get padName => _gamepad.name;
   int get keyboardMask => _keyboard;
 
   void _applyInput() {
-    final held = _keyboard | _gamepad.pressed | _pad.pressed;
+    final held = _keyboard | _gamepad.pressed;
     final changed = held != _held;
     _held = held;
 
@@ -360,7 +358,6 @@ class EmulatorSession extends ChangeNotifier {
 
   @override
   void dispose() {
-    _pad.dispose();
     stop();
     super.dispose();
   }

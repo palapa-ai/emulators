@@ -4,9 +4,9 @@ import 'package:flutter/widgets.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import 'emulator_skin.dart';
+import 'emulator_view_model.dart';
 import 'style_overlay.dart';
 import 'vhs_view.dart';
-import 'emulator_view_model.dart';
 
 final _keyBindings = <LogicalKeyboardKey, EmulatorButton>{
   .arrowUp: .up,

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'library_root.dart';
 
 /// Where libretro cores are kept, alongside the cartridges.
 ///
@@ -15,10 +15,7 @@ class CoreLibrary {
   static const _extensions = {'.dylib', '.so', '.dll'};
 
   Future<Directory> root() async {
-    final base = rootPath ?? (await getApplicationSupportDirectory()).path;
-    final directory = Directory('$base${Platform.pathSeparator}cores');
-    if (!directory.existsSync()) await directory.create(recursive: true);
-    return directory;
+    return libraryRoot(rootPath, 'cores');
   }
 
   Future<List<String>> installed() async {

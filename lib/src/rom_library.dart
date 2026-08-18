@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'library_root.dart';
 
 import 'rom_file.dart';
 
@@ -17,10 +17,7 @@ class RomLibrary {
   final String? rootPath;
 
   Future<Directory> root() async {
-    final base = rootPath ?? (await getApplicationSupportDirectory()).path;
-    final directory = Directory('$base${Platform.pathSeparator}roms');
-    if (!directory.existsSync()) await directory.create(recursive: true);
-    return directory;
+    return libraryRoot(rootPath, 'roms');
   }
 
   Future<List<RomFile>> load() async {

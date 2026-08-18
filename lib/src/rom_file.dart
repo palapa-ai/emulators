@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'rom_notes.dart';
+
 /// Which machine a cartridge belongs to, taken from its extension — the
 /// shelf is grouped by system even when only one of them has anything in it.
 enum RomSystem {
@@ -43,6 +45,8 @@ class RomFile {
   final String path;
   final String title;
   final int sizeBytes;
+
+  String? get note => RomNotes.forTitle(title);
 
   static final extensions = {
     for (final system in RomSystem.values) ...system.extensions,

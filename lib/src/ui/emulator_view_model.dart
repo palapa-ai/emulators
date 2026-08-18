@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../core_library.dart';
-import '../emulator_button.dart';
 import '../display_style.dart';
+import '../emulator_button.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
 import '../rom_file.dart';
@@ -139,7 +139,7 @@ class EmulatorViewModel extends ChangeNotifier {
   List<PadElement> get padLog => session.padLog;
   int get heldMask => session.heldMask;
   int get padMask => session.padMask;
-  List<String> get padKeys => session.padKeys;
+  String? get padName => session.padName;
   int get keyboardMask => session.keyboardMask;
   bool get isCollecting => session.isCollecting;
 

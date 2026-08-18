@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:emulators/emulators.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 void main() => runApp(const EmulatorsExample());
 
@@ -22,7 +22,7 @@ class EmulatorsExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WidgetsApp(
-      title: 'Palapa Emulator',
+      title: 'Emulator Palapa',
       color: const Color(0xff101014),
       builder: (context, _) => const _Workbench(),
     );
@@ -226,6 +226,15 @@ class _LibraryCard extends StatelessWidget {
                         rom.sizeLabel,
                         role: EmulatorTextRole.caption,
                       ),
+                      if (rom.note case final note?) ...[
+                        const SizedBox(height: 6),
+                        skin.text(
+                          context,
+                          note,
+                          role: EmulatorTextRole.caption,
+                          maxLines: 3,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -240,13 +249,14 @@ class _LibraryCard extends StatelessWidget {
                     skin: skin,
                     rom: rom,
                     saving: false,
+                    showLabel: false,
                   ),
                 ),
                 GestureDetector(
                   onTap: () => viewModel.remove(rom),
-                  child: const Icon(
-                    CupertinoIcons.trash_circle,
-                    size: 20,
+                  child: const EmulatorGlyph(
+                    EmulatorIcon.delete,
+                    size: 16,
                     color: Color(0xffe05a5a),
                   ),
                 ),
@@ -267,12 +277,14 @@ class _Slots extends StatelessWidget {
     required this.skin,
     this.rom,
     this.saving = true,
+    this.showLabel = true,
   });
 
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
   final RomFile? rom;
   final bool saving;
+  final bool showLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -281,7 +293,7 @@ class _Slots extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        skin.text(context, saving ? 'Save' : 'Load'),
+        if (showLabel) skin.text(context, saving ? 'Save' : 'Load'),
         for (var slot = 1; slot <= EmulatorViewModel.slotCount; slot++) ...[
           const SizedBox(width: 6),
           GestureDetector(
@@ -341,10 +353,9 @@ class _CopyPathState extends State<_CopyPath> {
       onTap: _copy,
       child: Row(
         children: [
-          Icon(
-            _copied ? CupertinoIcons.checkmark_circle_fill
-                    : CupertinoIcons.doc_on_doc,
-            size: 14,
+          EmulatorGlyph(
+            _copied ? EmulatorIcon.check : EmulatorIcon.copy,
+            size: 13,
             color: _copied
                 ? const Color(0xff7fd4a8)
                 : const Color(0x8ce8e8ee),
@@ -381,7 +392,7 @@ class _PadTicker extends StatelessWidget {
         skin.text(
           context,
           'mask ${viewModel.heldMask}  pad ${viewModel.padMask}  '
-          '${viewModel.padKeys.isEmpty ? 'no pad events' : viewModel.padKeys.join(' ')}',
+'${viewModel.padName ?? 'no pad'}',
           role: EmulatorTextRole.caption,
         ),
       ],

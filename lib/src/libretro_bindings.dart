@@ -1,7 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:ffi/ffi.dart';
+import 'native_memory.dart';
 
 final class EmuSession extends Opaque {}
 

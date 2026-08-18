@@ -27,16 +27,16 @@ void main() {
   });
 
   test('a scanline darkens the bottom of the emulated pixel', () {
-    const style = DisplayStyle.pvm;
+    const style = DisplayStyle.trinitron;
     final lit = style.sample(0.5, 0.1, 0);
     final dark = style.sample(0.5, 0.95, 0);
 
     expect(dark.g, lessThan(lit.g));
   });
 
-  test('the triad mask shifts with the row', () {
-    const style = DisplayStyle.shadowMask;
+  test('the phosphor triad splits the pixel into three bands', () {
+    const style = DisplayStyle.trinitron;
 
-    expect(style.sample(0.1, 0.1, 0).r, isNot(style.sample(0.1, 0.1, 1).r));
+    expect(style.sample(0.1, 0.1, 0).r, greaterThan(style.sample(0.5, 0.1, 0).r));
   });
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'emulator_glyph.dart';
+
 enum EmulatorTextRole { heading, body, caption }
 
 /// Named rather than drawn here, so a host can map them onto its own icon set
@@ -17,6 +19,8 @@ enum EmulatorIcon {
   save,
   load,
   speed,
+  copy,
+  check,
 }
 
 /// How the package draws its own chrome.
@@ -69,12 +73,17 @@ class EmulatorSkin {
   }) => GestureDetector(
     onTap: onTap,
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: EdgeInsets.symmetric(horizontal: icon == null ? 12 : 8, vertical: 7),
       decoration: BoxDecoration(
         border: Border.all(color: line(context)),
         borderRadius: BorderRadius.circular(5),
       ),
-      child: text(context, label, role: EmulatorTextRole.caption),
+      child: icon == null
+          ? text(context, label, role: EmulatorTextRole.caption)
+          : EmulatorGlyph(
+              icon,
+              color: textStyle(context, EmulatorTextRole.caption).color,
+            ),
     ),
   );
 

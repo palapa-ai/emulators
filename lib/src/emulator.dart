@@ -2,10 +2,9 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:ffi/ffi.dart';
-
 import 'emulator_button.dart';
 import 'libretro_bindings.dart';
+import 'native_memory.dart';
 
 class EmulatorException implements Exception {
   EmulatorException(this.message);
@@ -39,21 +38,21 @@ class Emulator {
     final isolated = '${scratch.path}/core.dylib';
     File(corePath).copySync(isolated);
 
-    final core = isolated.toNativeUtf8();
-    final rom = romPath.toNativeUtf8();
-    final err = calloc<Uint8>(512).cast<Utf8>();
+    final core = isolated.toNative();
+    final rom = romPath.toNative();
+    final err = allocate(512).cast<Utf8>();
 
     try {
       final session = bindings.open(core, rom, err, 512);
       if (session == nullptr) {
         scratch.deleteSync(recursive: true);
-        throw EmulatorException(err.toDartString());
+        throw EmulatorException(err.toDart());
       }
       return Emulator._(bindings, session, corePath, romPath, scratch);
     } finally {
-      calloc.free(core);
-      calloc.free(rom);
-      calloc.free(err);
+      release(core);
+      release(rom);
+      release(err);
     }
   }
 
@@ -65,8 +64,8 @@ class Emulator {
 
   bool _closed = false;
 
-  String get coreName => _bindings.coreName(_session).toDartString();
-  String get coreVersion => _bindings.coreVersion(_session).toDartString();
+  String get coreName => _bindings.coreName(_session).toDart();
+  String get coreVersion => _bindings.coreVersion(_session).toDart();
   double get framesPerSecond => _bindings.fps(_session);
   double get sampleRate => _bindings.sampleRate(_session);
   double get aspectRatio => _bindings.aspectRatio(_session);
@@ -110,13 +109,13 @@ class Emulator {
 
   /// Drains queued audio as interleaved stereo 16-bit frames.
   Int16List readAudio({int maxFrames = 4096}) {
-    final buffer = calloc<Int16>(maxFrames * 2);
+    final buffer = allocate(maxFrames * 2 * sizeOf<Int16>()).cast<Int16>();
 
     try {
       final got = _bindings.audioRead(_session, buffer, maxFrames);
       return Int16List.fromList(buffer.asTypedList(got * 2));
     } finally {
-      calloc.free(buffer);
+      release(buffer);
     }
   }
 
@@ -124,24 +123,24 @@ class Emulator {
     final size = _bindings.stateSize(_session);
     if (size == 0) return null;
 
-    final buffer = calloc<Uint8>(size);
+    final buffer = allocate(size);
 
     try {
       if (_bindings.stateSave(_session, buffer.cast(), size) == 0) return null;
       return Uint8List.fromList(buffer.asTypedList(size));
     } finally {
-      calloc.free(buffer);
+      release(buffer);
     }
   }
 
   bool loadState(Uint8List state) {
-    final buffer = calloc<Uint8>(state.length);
+    final buffer = allocate(state.length);
 
     try {
       buffer.asTypedList(state.length).setAll(0, state);
       return _bindings.stateLoad(_session, buffer.cast(), state.length) != 0;
     } finally {
-      calloc.free(buffer);
+      release(buffer);
     }
   }
 

@@ -1,7 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:ffi/ffi.dart';
+import 'native_memory.dart';
 
 typedef _ButtonsNative = Uint32 Function();
 typedef _Buttons = int Function();
@@ -53,6 +53,6 @@ class Gamepad {
 
   String? get name {
     final pointer = _name?.call() ?? nullptr;
-    return pointer == nullptr ? null : pointer.toDartString();
+    return pointer == nullptr ? null : pointer.toDart();
   }
 }
