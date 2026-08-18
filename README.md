@@ -60,9 +60,28 @@ EmulatorTheme(
 )
 ```
 
-`EmulatorScreenState.addFiles` and `.refresh` let a host add cartridges its own
+`EmulatorViewModel.addFiles` and `.refresh` let a host add cartridges its own
 way — a drop target, a file picker — without the package taking on those
 dependencies.
+
+## Input
+
+Keyboard and a physical pad both work, and are merged rather than exclusive:
+arrows for the d-pad, `Z`/`X` are B/A, `A`/`S` are Y/X, `Q`/`W` are L/R,
+Return is Start, right Shift is Select.
+
+Pads are read through Apple's GameController framework, which names buttons by
+position — so the SNES mapping is written once (the bottom face button is B,
+the right one is A) instead of guessed from whatever indices a given device
+reports.
+
+## Audio
+
+The host plays the core's output through AudioQueue, and emulation paces on
+that backlog rather than a timer: a timer runs at wall-clock rate, which is
+never exactly the device's rate, so the two drift and the sound crackles.
+Running a frame only while the device is short of work makes the sound card
+the clock.
 
 ## Display styles
 

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'emulator.dart';
 import 'emulator_button.dart';
+import 'gamepad.dart';
 import 'rom_file.dart';
 
 /// [unavailable] is not something the user did — it means no native core was
@@ -25,6 +26,11 @@ class EmulatorSession extends ChangeNotifier {
   Emulator? _emulator;
   Timer? _pump;
   bool _decoding = false;
+
+  final _gamepad = Gamepad.open();
+  int _keyboard = 0;
+
+  bool get hasGamepad => _gamepad.isConnected;
 
   /// Roughly three frames of sound in hand — enough to ride out a slow decode,
   /// short enough that a button press is not heard late.
@@ -81,6 +87,7 @@ class EmulatorSession extends ChangeNotifier {
   }
 
   void stop() {
+    _keyboard = 0;
     _pump?.cancel();
     _pump = null;
     _emulator?.stopAudio();
@@ -94,8 +101,20 @@ class EmulatorSession extends ChangeNotifier {
 
   void reset() => _emulator?.reset();
 
-  void press(EmulatorButton button, {required bool pressed}) =>
-      _emulator?.setButton(button, pressed: pressed);
+  /// Held keys are remembered rather than pushed straight through, because
+  /// the pad is polled every frame and would otherwise clear them.
+  void press(EmulatorButton button, {required bool pressed}) {
+    final bit = 1 << button.id;
+    _keyboard = pressed ? _keyboard | bit : _keyboard & ~bit;
+  }
+
+  void _applyInput() {
+    final held = _keyboard | _gamepad.pressed;
+
+    for (final button in EmulatorButton.values) {
+      _emulator?.setButton(button, pressed: held >> button.id & 1 == 1);
+    }
+  }
 
   /// Runs only while the sound card is short of work. Pacing on the backlog
   /// rather than a wall clock means the emulator cannot drift against the
@@ -107,6 +126,7 @@ class EmulatorSession extends ChangeNotifier {
 
     _decoding = true;
     try {
+      _applyInput();
       emulator.runFrame();
 
       final pixels = emulator.frame;
