@@ -1,136 +1,140 @@
 # emulators
 
-Console emulation for Palapa. The package wraps [libretro](https://docs.libretro.com)
-cores: the native side is a thin host that pumps frames, audio and input, and
-the Dart side owns sessions, save states and the display styles.
+Console emulation for Flutter. The package wraps [libretro](https://docs.libretro.com)
+cores: a thin native host pumps frames, audio and input, and the Dart side owns
+sessions, save states, display styles and the screen.
 
-Nothing about the emulated system is hard-coded — any libretro core works. The
-one exercised so far is `snes9x2010` (SNES).
-
-## Layout
-
-```
-macos/emulators/Sources/emulators/  libretro_host.[ch] — the native host
-lib/src/             Emulator, EmulatorSession, RomLibrary, FFI bindings
-lib/src/ui/          EmulatorScreen and the skin that draws it
-example/             runs the package on its own
-tool/harness/        SDL harness: run a ROM with no Flutter at all
-macos/, ios/         Package.swift + podspec (ffiPlugin)
-```
-
-## Using it
-
-```dart
-final emulator = Emulator.open(corePath: corePath, romPath: romPath);
-
-emulator.setButton(EmulatorButton.start, pressed: true);
-emulator.runFrame();
-
-final pixels = emulator.frame;          // ARGB8888, aliases native memory
-final audio = emulator.readAudio();     // interleaved stereo 16-bit
-
-final state = emulator.saveState();
-emulator.close();
-```
-
-`Emulator.frame` returns a view onto native memory that the next `runFrame`
-overwrites. Copy it if it needs to outlive the frame.
-
-**One session per process.** libretro cores keep their state in globals and
-take their callbacks as global function pointers, so a second `Emulator.open`
-throws while one is alive. That is a property of libretro, not of this package.
-
-## The screen
-
-`EmulatorScreen` is the whole feature — the running game over the shelf it came
-from. It draws with `package:flutter/widgets.dart` only: plain text and taps,
-no design system, so it runs on its own.
+Nothing about a particular console is baked in — any libretro core works. The
+one exercised so far is `snes9x2010`.
 
 ```dart
 EmulatorScreen(corePath: corePath)
 ```
 
-A host restyles it by subclassing `EmulatorSkin` and wrapping the screen —
-nothing about the host's design system reaches the package:
+That is the whole feature: the running game over the shelf it came from,
+drawn with `package:flutter/widgets.dart` only.
 
-```dart
-EmulatorTheme(
-  skin: const MySkin(),          // override text/button/cartridge
-  child: EmulatorScreen(corePath: corePath),
-)
+## Layout
+
+```
+macos/emulators/Sources/emulators_host/   libretro_host.[ch] — the native host
+macos/emulators/Sources/emulators/        GameController reader
+lib/src/                                  Emulator, EmulatorSession, libraries
+lib/src/ui/                               screen, view model, skin, shader view
+shaders/                                  vhs.frag
+example/                                  the workbench
+tool/harness/                             SDL harness, no Flutter at all
 ```
 
-`EmulatorViewModel.addFiles` and `.refresh` let a host add cartridges its own
-way — a drop target, a file picker — without the package taking on those
-dependencies.
+## Sessions
+
+`EmulatorSession` drives one cartridge. It is a `ChangeNotifier`, so it needs
+nothing from any state-management library.
+
+```dart
+final session = EmulatorSession(corePath: corePath)..play(rom);
+
+session.press(EmulatorButton.start, pressed: true);
+session.pause();
+final state = session.saveState();
+```
+
+**Several at once.** libretro cores keep their state in globals, and dyld
+returns the same image for the same path — so each session opens its own
+private copy of the core. Without that, a second session silently shares the
+first one's memory. `EmulatorViewModel` uses this to give every shelf card a
+live picture, capped and throttled, with only the focused session audible.
 
 ## Input
 
-Keyboard and a physical pad both work, and are merged rather than exclusive:
-arrows for the d-pad, `Z`/`X` are B/A, `A`/`S` are Y/X, `Q`/`W` are L/R,
-Return is Start, right Shift is Select.
+Keyboard and pad are merged, never exclusive. Pads are read three ways —
+GameController by name, its legacy profile, and the `gamepads` plugin —
+because retro controllers disagree about what they call their own buttons.
 
-Pads are read through Apple's GameController framework, which names buttons by
-position — so the SNES mapping is written once (the bottom face button is B,
-the right one is A) instead of guessed from whatever indices a given device
-reports.
+Names a pad actually sends are reported (`session.padKeys`), so an unknown
+device is mapped from what it emits rather than guessed at. Raw hardware
+state is available separately from the SNES mapping, which is what a
+remapping UI needs.
+
+Sampling runs on its own timer rather than the frame loop: a paused game
+still has to read its controller.
 
 ## Audio
 
-The host plays the core's output through AudioQueue, and emulation paces on
-that backlog rather than a timer: a timer runs at wall-clock rate, which is
-never exactly the device's rate, so the two drift and the sound crackles.
-Running a frame only while the device is short of work makes the sound card
-the clock.
+The host plays through AudioQueue, and **emulation paces on the audio
+backlog** rather than a timer. A timer runs at wall-clock rate, which is never
+exactly the device's rate; the two drift and the sound crackles. Running a
+frame only while the device is short of work makes the sound card the clock.
+
+Off 1x the device can no longer be the clock — it drains at one rate — so wall
+time takes over there and samples are discarded rather than queued.
 
 ## Display styles
 
-Ten looks, each a fraction-of-an-emulated-pixel description rather than a count
-of screen pixels — so a style reads identically at any output size instead of
+Each style is a fraction-of-an-emulated-pixel description rather than a count
+of screen pixels, so a look reads identically at any output size instead of
 getting finer as the window grows.
 
 | Style | Character |
 | --- | --- |
-| Trinitron | Sony aperture grille, RGB stripes, fine scanlines |
-| PVM 20 | Broadcast monitor, heavy 50% scanlines |
-| Shadow Mask | Consumer CRT, triads staggered per row |
-| Arcade | Tube, deepest scanlines, warm |
+| VHS | Tape: wobble, tracking band, chroma bleed, dropouts, head-switch tear |
+| Trinitron | Aperture grille, RGB stripes, fine scanlines |
+| Arcade | Tube, deep scanlines, warm |
 | Horizontal | Horizontal pixels — vertical stripes |
-| Dot Matrix | Square dot grid, wide gaps |
-| LCD | Tight grid, cool tint |
-| OLED | Deep pixel gaps, neutral |
-| Game Boy | DMG green, dot grid |
-| Composite | Soft, subtle scanlines, warm |
+| Dot Matrix | Square dot grid |
+| NES | 256×240, scanlines |
+| Game Boy | 160×144, DMG green, 8-bit mono audio |
+| Composite | Soft, subtle scanlines |
 
-`DisplayStyle.sample(fx, fy, row)` returns the multiplier for one output pixel.
-Styles only ever darken or tint, never brighten.
+VHS is a fragment shader, because none of it is geometry. Everything in it is
+reseeded per field rather than scrolled: sliding noise reads as a texture laid
+over the picture, which is the one thing tape never looks like.
 
-## Harness
+NES and Game Boy reduce resolution for real — down then up with nearest
+sampling, so the detail is gone rather than blurred. Whichever axis reduces
+more sets the scale, so one lands exactly on native and the shape survives.
 
-Runs a ROM in a window with no Flutter host, for exercising cores and styles:
+A style can degrade sound as well as picture: the handheld was a piece of
+hardware, not only a screen.
 
+## Skinning
+
+The package draws plainly on purpose. A host restyles it by subclassing
+`EmulatorSkin` — text, buttons, panels, cartridges — and wrapping the screen:
+
+```dart
+EmulatorTheme(
+  skin: const MySkin(),
+  child: EmulatorScreen(viewModel: viewModel),
+)
 ```
-cd tool/harness && make
-./harness /path/to/core.dylib /path/to/rom.sfc
-```
 
-Arrows move; `Z`/`X` are B/A, `A`/`S` are Y/X, `Q`/`W` are L/R, Return is Start,
-right Shift is Select. `[` and `]` cycle styles, `1`–`9` and `0` pick one, `C`
-toggles the filter, `R` resets, Escape quits. A game controller is picked up
-automatically; `EMU_NO_PAD=1` skips that.
-
-Requires SDL2 (`brew install sdl2`). The harness is a development tool — the
-package itself has no SDL dependency.
+Icons are *named* (`EmulatorIcon.reset`), never drawn by the package, so a
+host maps them onto its own set without the package depending on one.
 
 ## Cores
 
-Cores are not vendored. Build one and point the package at the `.dylib`:
+Cores are not vendored. Build one and drop it beside the cartridges, or name
+it explicitly:
 
 ```
 git clone --depth 1 https://github.com/libretro/snes9x2010
 cd snes9x2010 && make -f Makefile.libretro
 ```
 
-Note that snes9x-derived cores carry a **non-commercial** licence. Cores with
-permissive terms (for example `ares`) are the ones to reach for if that
-matters.
+`CoreLibrary` finds whatever is in `<root>/cores`. Note that snes9x-derived
+cores carry a **non-commercial** licence; permissive cores such as `ares` are
+the ones to reach for if that matters.
+
+## Running it
+
+```
+cd example && flutter run -d macos
+```
+
+Cartridges are read from `<root>/roms`. The workbench shows the library with
+live previews, the picture, a button log reporting raw controller elements,
+and an activity log.
+
+`tool/harness` runs a ROM through the same host with no Flutter at all —
+useful for isolating whether a problem is in the core or the app.

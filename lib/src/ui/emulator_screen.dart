@@ -145,8 +145,11 @@ class _Stage extends StatelessWidget {
     return Column(
       children: [
         Expanded(
-          child: ColoredBox(
-            color: skin.screen(context),
+          child: Container(
+            decoration: BoxDecoration(
+              color: skin.screen(context),
+              border: Border.all(color: skin.line(context)),
+            ),
             child: SizedBox.expand(
               child: switch (session.frame) {
                   null => const SizedBox.expand(),

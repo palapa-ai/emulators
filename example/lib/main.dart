@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:emulators/emulators.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 
 void main() => runApp(const EmulatorsExample());
 
@@ -64,9 +65,7 @@ class _WorkbenchState extends State<_Workbench> {
               children: [
                 SizedBox(
                   width: 380,
-                  child: SingleChildScrollView(
-                    child: _Library(viewModel: _viewModel, skin: skin),
-                  ),
+                  child: _Library(viewModel: _viewModel, skin: skin),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -136,20 +135,24 @@ class _Library extends StatelessWidget {
       title: counts.entries
           .map((e) => '${e.key.label} (${e.value})')
           .join('   '),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final rom in roms.take(EmulatorViewModel.maxPreviews + 3))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _LibraryCard(
-                viewModel: viewModel,
-                skin: skin,
-                rom: rom,
-                playing: rom == viewModel.playing,
-              ),
-            ),
-        ],
+      child: Expanded(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final rom in roms.take(EmulatorViewModel.maxPreviews + 3))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _LibraryCard(
+                    viewModel: viewModel,
+                    skin: skin,
+                    rom: rom,
+                    playing: rom == viewModel.playing,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -226,20 +229,28 @@ class _LibraryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                skin.button(
-                  context,
-                  label: 'Delete',
-                  icon: EmulatorIcon.delete,
-                  onTap: () => viewModel.remove(rom),
-                ),
               ],
             ),
             const SizedBox(height: 8),
-            _Slots(
-              viewModel: viewModel,
-              skin: skin,
-              rom: rom,
-              saving: false,
+            Row(
+              children: [
+                Expanded(
+                  child: _Slots(
+                    viewModel: viewModel,
+                    skin: skin,
+                    rom: rom,
+                    saving: false,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => viewModel.remove(rom),
+                  child: const Icon(
+                    CupertinoIcons.trash_circle,
+                    size: 20,
+                    color: Color(0xffe05a5a),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             _CopyPath(rom: rom, skin: skin),
@@ -294,28 +305,59 @@ class _Slots extends StatelessWidget {
   }
 }
 
-class _CopyPath extends StatelessWidget {
+class _CopyPath extends StatefulWidget {
   const _CopyPath({required this.rom, required this.skin});
 
   final RomFile rom;
   final EmulatorSkin skin;
 
   @override
+  State<_CopyPath> createState() => _CopyPathState();
+}
+
+class _CopyPathState extends State<_CopyPath> {
+  Timer? _confirm;
+  bool _copied = false;
+
+  @override
+  void dispose() {
+    _confirm?.cancel();
+    super.dispose();
+  }
+
+  void _copy() {
+    Clipboard.setData(ClipboardData(text: widget.rom.path));
+    setState(() => _copied = true);
+    _confirm?.cancel();
+    _confirm = Timer(
+      const Duration(seconds: 2),
+      () => mounted ? setState(() => _copied = false) : null,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Clipboard.setData(ClipboardData(text: rom.path)),
+      onTap: _copy,
       child: Row(
         children: [
+          Icon(
+            _copied ? CupertinoIcons.checkmark_circle_fill
+                    : CupertinoIcons.doc_on_doc,
+            size: 14,
+            color: _copied
+                ? const Color(0xff7fd4a8)
+                : const Color(0x8ce8e8ee),
+          ),
+          const SizedBox(width: 6),
           Expanded(
-            child: skin.text(
+            child: widget.skin.text(
               context,
-              rom.fileName,
+              widget.rom.fileName,
               role: EmulatorTextRole.caption,
               maxLines: 1,
             ),
           ),
-          const SizedBox(width: 6),
-          Image.memory(EmulatorIcons.copy, width: 13, height: 13),
         ],
       ),
     );
@@ -382,11 +424,27 @@ class _Log extends StatelessWidget {
           reverse: true,
           padding: EdgeInsets.zero,
           itemCount: lines.length,
-          itemBuilder: (_, i) => skin.text(
-            context,
-            lines[lines.length - 1 - i],
-            role: EmulatorTextRole.caption,
-          ),
+          itemBuilder: (_, i) {
+            final row = lines.length - 1 - i;
+            return ColoredBox(
+              color: row.isEven
+                  ? const Color(0x00000000)
+                  : const Color(0x0affffff),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                child: Text(
+                  lines[row],
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 10,
+                    height: 1.4,
+                    color: Color(0x99e8e8ee),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
