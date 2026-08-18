@@ -1,5 +1,5 @@
 SDL  := $(lastword $(sort $(wildcard /opt/homebrew/Cellar/sdl2/*)))
-SRC  := ../../macos/emulators/Sources/emulators
+SRC  := ../../macos/emulators/Sources/emulators_host
 
 CFLAGS  := -O2 -Wall -Wextra -std=c11 -I$(SDL)/include -I$(SRC)/include
 LDFLAGS := -L$(SDL)/lib -lSDL2
