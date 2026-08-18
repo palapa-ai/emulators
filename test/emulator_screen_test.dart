@@ -39,6 +39,7 @@ void main() {
       ..createSync(recursive: true)
       ..childFile('Star Fox (U) (V1.2) [!].smc').writeAsBytesSync([0, 1, 2]);
 
+
     await tester.pumpWidget(_wrap(EmulatorScreen(libraryRoot: temp.path)));
     await tester.pumpAndSettle();
 
