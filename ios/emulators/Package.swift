@@ -14,6 +14,10 @@ let package = Package(
       cSettings: [.headerSearchPath("include")],
       linkerSettings: [.linkedFramework("AudioToolbox")]
     ),
-    .target(name: "emulators", dependencies: ["emulators_host"]),
+    .target(
+      name: "emulators",
+      dependencies: ["emulators_host"],
+      linkerSettings: [.linkedFramework("GameController")]
+    ),
   ]
 )
