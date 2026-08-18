@@ -32,12 +32,14 @@ class EmulatorScreen extends StatefulWidget {
     this.viewModel,
     this.corePath,
     this.libraryRoot,
+    this.autoPlay = false,
     super.key,
   });
 
   final EmulatorViewModel? viewModel;
   final String? corePath;
   final String? libraryRoot;
+  final bool autoPlay;
 
   @override
   State<EmulatorScreen> createState() => _EmulatorScreenState();
@@ -51,6 +53,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
       (_owned ??= EmulatorViewModel(
         corePath: widget.corePath,
         libraryRoot: widget.libraryRoot,
+        autoPlay: widget.autoPlay,
       ));
 
   @override
