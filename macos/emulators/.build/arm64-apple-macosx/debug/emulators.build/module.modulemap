@@ -1,4 +1,0 @@
-module emulators {
-    umbrella "/Users/saad/dev/palapa-ai/emulators/macos/emulators/Sources/emulators/include"
-    export *
-}
