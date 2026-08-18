@@ -111,16 +111,15 @@ class LibretroBindings {
         'emu_sram_data',
       );
 
-  factory LibretroBindings.open() =>
-      LibretroBindings._(DynamicLibrary.open(_libraryName));
-
-  static String get _libraryName {
-    if (Platform.isMacOS || Platform.isIOS) {
-      return 'emulators.framework/emulators';
-    }
-    if (Platform.isWindows) return 'emulators.dll';
-    return 'libemulators.so';
-  }
+  /// Apple builds link the plugin statically into the app binary, so the
+  /// symbols are already in the process and there is no library to open.
+  factory LibretroBindings.open() => LibretroBindings._(
+    Platform.isMacOS || Platform.isIOS
+        ? DynamicLibrary.process()
+        : DynamicLibrary.open(Platform.isWindows
+              ? 'emulators.dll'
+              : 'libemulators.so'),
+  );
 
   final EmuOpen open;
   final EmuVoidSession close;
