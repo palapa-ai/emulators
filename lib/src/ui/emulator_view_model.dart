@@ -37,6 +37,8 @@ class EmulatorViewModel extends ChangeNotifier {
   List<RomFile> get roms => _roms;
 
   RomFile? get playing => session.rom;
+  bool get isPaused => session.isPaused;
+  List<String> get logLines => session.logLines;
   bool get hasGamepad => session.hasGamepad;
   String? get gamepadName => session.gamepadName;
   SessionStatus get status => session.status;
@@ -71,16 +73,21 @@ class EmulatorViewModel extends ChangeNotifier {
 
   Future<void> addFiles(Iterable<String> paths) async {
     _roms = await _library.add(paths);
+    session.log('added ${paths.length} file(s)');
     notifyListeners();
   }
 
   Future<void> remove(RomFile rom) async {
     if (session.rom == rom) session.stop();
     _roms = await _library.remove(rom);
+    session.log('removed ${rom.title}');
     notifyListeners();
   }
 
   void play(RomFile rom) => session.play(rom);
+  void pause() => session.pause();
+  void resume() => session.resume();
+  void togglePause() => session.isPaused ? session.resume() : session.pause();
   void stop() => session.stop();
   void reset() => session.reset();
 

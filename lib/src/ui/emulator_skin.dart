@@ -4,7 +4,7 @@ enum EmulatorTextRole { heading, body, caption }
 
 /// Named rather than drawn here, so a host can map them onto its own icon set
 /// without the package depending on one.
-enum EmulatorIcon { reset, eject, controller }
+enum EmulatorIcon { reset, eject, controller, pause, play, delete }
 
 /// How the package draws its own chrome.
 ///

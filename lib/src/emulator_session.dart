@@ -28,6 +28,21 @@ class EmulatorSession extends ChangeNotifier {
   bool _decoding = false;
 
   final _gamepad = Gamepad.open();
+  final _log = <String>[];
+
+  List<String> get logLines => List.unmodifiable(_log);
+
+  void log(String line) {
+    final now = DateTime.now();
+    final stamp =
+        '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}:'
+        '${now.second.toString().padLeft(2, '0')}';
+    _log.add('$stamp  $line');
+    if (_log.length > 200) _log.removeAt(0);
+    notifyListeners();
+  }
+
   int _keyboard = 0;
 
   bool get hasGamepad => _gamepad.isConnected;
@@ -40,6 +55,7 @@ class EmulatorSession extends ChangeNotifier {
           .round();
 
   SessionStatus _status = SessionStatus.idle;
+  bool _paused = false;
   RomFile? _rom;
   ui.Image? _frame;
   String? _error;
@@ -49,6 +65,7 @@ class EmulatorSession extends ChangeNotifier {
   ui.Image? get frame => _frame;
   String? get error => _error;
   bool get isRunning => _emulator != null;
+  bool get isPaused => _paused;
   double get aspectRatio => _emulator?.aspectRatio ?? 4 / 3;
   String get coreName => _emulator?.coreName ?? '';
 
@@ -59,6 +76,7 @@ class EmulatorSession extends ChangeNotifier {
     if (core == null) {
       _status = SessionStatus.unavailable;
       _error = 'No emulator core is bundled for this platform.';
+      log('no core available');
       notifyListeners();
       return;
     }
@@ -68,10 +86,14 @@ class EmulatorSession extends ChangeNotifier {
       _status = SessionStatus.running;
       _rom = rom;
       _error = null;
+      _paused = false;
+      log('loaded ${rom.title}');
+      log('core ${_emulator?.coreName} ${_emulator?.coreVersion}');
     } on Object catch (e) {
       _emulator = null;
       _status = SessionStatus.failed;
       _error = '$e';
+      log('failed to load ${rom.title}');
       notifyListeners();
       return;
     }
@@ -100,7 +122,26 @@ class EmulatorSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void reset() => _emulator?.reset();
+  void pause() {
+    if (_emulator == null || _paused) return;
+    _paused = true;
+    _emulator?.stopAudio();
+    log('paused');
+    notifyListeners();
+  }
+
+  void resume() {
+    if (_emulator == null || !_paused) return;
+    _paused = false;
+    _emulator?.startAudio();
+    log('resumed');
+    notifyListeners();
+  }
+
+  void reset() {
+    _emulator?.reset();
+    log('reset');
+  }
 
   /// Held keys are remembered rather than pushed straight through, because
   /// the pad is polled every frame and would otherwise clear them.
@@ -122,7 +163,7 @@ class EmulatorSession extends ChangeNotifier {
   /// device, which is what makes audio crackle or slowly desynchronise.
   Future<void> _tick() async {
     final emulator = _emulator;
-    if (emulator == null || _decoding) return;
+    if (emulator == null || _decoding || _paused) return;
     if (emulator.queuedAudioFrames >= _targetBacklogFrames) return;
 
     _decoding = true;
