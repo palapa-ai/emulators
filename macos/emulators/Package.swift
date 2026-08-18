@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "emulators",
-  platforms: [.macOS("11.0")],
+  platforms: [.macOS("10.15")],
   products: [
     .library(name: "emulators", targets: ["emulators", "emulators_host"])
   ],
