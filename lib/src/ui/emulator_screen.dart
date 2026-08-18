@@ -34,8 +34,12 @@ class EmulatorScreen extends StatefulWidget {
     this.libraryRoot,
     this.autoPlay = false,
     this.onPairController,
+    this.showShelf = true,
     super.key,
   });
+
+  /// Hosts that give the collection its own place on screen turn this off.
+  final bool showShelf;
 
   /// Shown as a button while no pad is attached — pairing is the host's
   /// business, since only it knows how this platform opens Bluetooth.
@@ -98,8 +102,10 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
                   onPairController: widget.onPairController,
                 ),
               ),
-              const SizedBox(height: 16),
-              _Shelf(viewModel: viewModel, skin: skin),
+              if (widget.showShelf) ...[
+                const SizedBox(height: 16),
+                _Shelf(viewModel: viewModel, skin: skin),
+              ],
             ],
           ),
         ),
