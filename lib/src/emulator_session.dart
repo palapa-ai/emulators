@@ -31,6 +31,7 @@ class EmulatorSession extends ChangeNotifier {
   int _keyboard = 0;
 
   bool get hasGamepad => _gamepad.isConnected;
+  String? get gamepadName => _gamepad.name;
 
   /// Roughly three frames of sound in hand — enough to ride out a slow decode,
   /// short enough that a button press is not heard late.

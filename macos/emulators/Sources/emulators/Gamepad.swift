@@ -41,3 +41,16 @@ public func emu_gamepad_buttons() -> UInt32 {
 public func emu_gamepad_connected() -> Int32 {
   GCController.controllers().first?.extendedGamepad != nil ? 1 : 0
 }
+
+private var nameBuffer: UnsafeMutablePointer<CChar>?
+
+/// Owned by this module and replaced on each call, so callers may read it but
+/// must not free it.
+@_cdecl("emu_gamepad_name")
+public func emu_gamepad_name() -> UnsafePointer<CChar>? {
+  guard let controller = GCController.controllers().first else { return nil }
+
+  nameBuffer.map { free($0) }
+  nameBuffer = strdup(controller.vendorName ?? "Controller")
+  return UnsafePointer(nameBuffer)
+}

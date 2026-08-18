@@ -33,8 +33,13 @@ class EmulatorScreen extends StatefulWidget {
     this.corePath,
     this.libraryRoot,
     this.autoPlay = false,
+    this.onPairController,
     super.key,
   });
+
+  /// Shown as a button while no pad is attached — pairing is the host's
+  /// business, since only it knows how this platform opens Bluetooth.
+  final VoidCallback? onPairController;
 
   final EmulatorViewModel? viewModel;
   final String? corePath;
@@ -87,7 +92,11 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             crossAxisAlignment: .stretch,
             children: [
               Expanded(
-                child: _Stage(viewModel: viewModel, skin: skin),
+                child: _Stage(
+                  viewModel: viewModel,
+                  skin: skin,
+                  onPairController: widget.onPairController,
+                ),
               ),
               const SizedBox(height: 16),
               _Shelf(viewModel: viewModel, skin: skin),
@@ -100,10 +109,15 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
 }
 
 class _Stage extends StatelessWidget {
-  const _Stage({required this.viewModel, required this.skin});
+  const _Stage({
+    required this.viewModel,
+    required this.skin,
+    this.onPairController,
+  });
 
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
+  final VoidCallback? onPairController;
 
   @override
   Widget build(BuildContext context) {
@@ -130,11 +144,28 @@ class _Stage extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            skin.text(context, rom.title, role: .heading),
             const Spacer(),
-            skin.button(context, label: 'Reset', onTap: viewModel.reset),
+            if (onPairController != null)
+              skin.button(
+                context,
+                label: viewModel.gamepadName ?? 'Pair controller',
+                icon: .controller,
+                onTap: onPairController ?? () {},
+              ),
+            if (onPairController != null) const SizedBox(width: 8),
+            skin.button(
+              context,
+              label: 'Reset',
+              icon: .reset,
+              onTap: viewModel.reset,
+            ),
             const SizedBox(width: 8),
-            skin.button(context, label: 'Eject', onTap: viewModel.stop),
+            skin.button(
+              context,
+              label: 'Eject',
+              icon: .eject,
+              onTap: viewModel.stop,
+            ),
           ],
         ),
       ],
@@ -172,42 +203,34 @@ class _Shelf extends StatelessWidget {
   Widget build(BuildContext context) {
     final roms = viewModel.roms;
 
-    return Column(
-      crossAxisAlignment: .stretch,
-      children: [
-        Row(
-          children: [
-            skin.text(context, 'Collection', role: .heading),
-            const SizedBox(width: 8),
-            skin.text(context, '${roms.length}', role: .caption),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 104,
-          child: roms.isEmpty
-              ? Center(
-                  child: skin.text(
-                    context,
-                    'No cartridges yet',
-                    role: .caption,
-                  ),
-                )
-              : ListView.separated(
-                  scrollDirection: .horizontal,
-                  itemCount: roms.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => skin.cartridge(
-                    context,
-                    title: roms[i].title,
-                    subtitle: roms[i].sizeLabel,
-                    playing: roms[i] == viewModel.playing,
-                    onTap: () => viewModel.play(roms[i]),
-                    onRemove: () => viewModel.remove(roms[i]),
-                  ),
+    return skin.panel(
+      context,
+      title: 'Collection',
+      trailing: [skin.text(context, '${roms.length}', role: .caption)],
+      child: SizedBox(
+        height: 104,
+        child: roms.isEmpty
+            ? Center(
+                child: skin.text(
+                  context,
+                  'No cartridges yet',
+                  role: .caption,
                 ),
-        ),
-      ],
+              )
+            : ListView.separated(
+                scrollDirection: .horizontal,
+                itemCount: roms.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => skin.cartridge(
+                  context,
+                  title: roms[i].title,
+                  subtitle: roms[i].sizeLabel,
+                  playing: roms[i] == viewModel.playing,
+                  onTap: () => viewModel.play(roms[i]),
+                  onRemove: () => viewModel.remove(roms[i]),
+                ),
+              ),
+      ),
     );
   }
 }

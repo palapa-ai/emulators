@@ -37,6 +37,8 @@ class EmulatorViewModel extends ChangeNotifier {
   List<RomFile> get roms => _roms;
 
   RomFile? get playing => session.rom;
+  bool get hasGamepad => session.hasGamepad;
+  String? get gamepadName => session.gamepadName;
   SessionStatus get status => session.status;
 
   Future<void> _findCore() async {
