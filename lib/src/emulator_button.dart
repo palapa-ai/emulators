@@ -14,4 +14,14 @@ enum EmulatorButton {
   r;
 
   int get id => index;
+
+  String get label => switch (this) {
+    EmulatorButton.up => '↑',
+    EmulatorButton.down => '↓',
+    EmulatorButton.left => '←',
+    EmulatorButton.right => '→',
+    EmulatorButton.select => 'SEL',
+    EmulatorButton.start => 'START',
+    _ => name.toUpperCase(),
+  };
 }

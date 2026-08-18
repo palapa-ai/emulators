@@ -29,6 +29,11 @@ class EmulatorSession extends ChangeNotifier {
 
   final _gamepad = Gamepad.open();
   final _log = <String>[];
+  final _buttonLog = <EmulatorButton>[];
+  int _lastHeld = 0;
+
+  /// Newest last. Only presses land here, not releases or repeats.
+  List<EmulatorButton> get buttonLog => List.unmodifiable(_buttonLog);
 
   List<String> get logLines => List.unmodifiable(_log);
 
@@ -111,6 +116,8 @@ class EmulatorSession extends ChangeNotifier {
 
   void stop() {
     _keyboard = 0;
+    _lastHeld = 0;
+    _buttonLog.clear();
     _pump?.cancel();
     _pump = null;
     _emulator?.stopAudio();
@@ -156,6 +163,18 @@ class EmulatorSession extends ChangeNotifier {
     for (final button in EmulatorButton.values) {
       _emulator?.setButton(button, pressed: held >> button.id & 1 == 1);
     }
+
+    final pressed = held & ~_lastHeld;
+    _lastHeld = held;
+    if (pressed == 0) return;
+
+    _buttonLog.addAll(
+      EmulatorButton.values.where((b) => pressed >> b.id & 1 == 1),
+    );
+    if (_buttonLog.length > 120) {
+      _buttonLog.removeRange(0, _buttonLog.length - 120);
+    }
+    notifyListeners();
   }
 
   /// Runs only while the sound card is short of work. Pacing on the backlog

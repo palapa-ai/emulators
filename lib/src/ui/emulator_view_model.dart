@@ -39,6 +39,7 @@ class EmulatorViewModel extends ChangeNotifier {
   RomFile? get playing => session.rom;
   bool get isPaused => session.isPaused;
   List<String> get logLines => session.logLines;
+  List<EmulatorButton> get buttonLog => session.buttonLog;
   bool get hasGamepad => session.hasGamepad;
   String? get gamepadName => session.gamepadName;
   SessionStatus get status => session.status;
