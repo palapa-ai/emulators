@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -20,20 +21,35 @@ class EmulatorException implements Exception {
 /// libretro cores keep their state in globals, so only one [Emulator] can be
 /// open at a time in a process; [open] throws while another is alive.
 class Emulator {
-  Emulator._(this._bindings, this._session, this.corePath, this.romPath);
+  Emulator._(
+    this._bindings,
+    this._session,
+    this.corePath,
+    this.romPath,
+    this._scratch,
+  );
 
+  /// Each session dlopens its **own copy** of the core. libretro keeps its
+  /// state in globals, and dyld hands back the same image for the same path —
+  /// so without a private copy a second session would silently share the
+  /// first one's memory.
   static Emulator open({required String corePath, required String romPath}) {
     final bindings = LibretroBindings.open();
-    final core = corePath.toNativeUtf8();
+    final scratch = Directory.systemTemp.createTempSync('emulator_core');
+    final isolated = '${scratch.path}/core.dylib';
+    File(corePath).copySync(isolated);
+
+    final core = isolated.toNativeUtf8();
     final rom = romPath.toNativeUtf8();
     final err = calloc<Uint8>(512).cast<Utf8>();
 
     try {
       final session = bindings.open(core, rom, err, 512);
       if (session == nullptr) {
+        scratch.deleteSync(recursive: true);
         throw EmulatorException(err.toDartString());
       }
-      return Emulator._(bindings, session, corePath, romPath);
+      return Emulator._(bindings, session, corePath, romPath, scratch);
     } finally {
       calloc.free(core);
       calloc.free(rom);
@@ -45,6 +61,7 @@ class Emulator {
   final Pointer<EmuSession> _session;
   final String corePath;
   final String romPath;
+  final Directory _scratch;
 
   bool _closed = false;
 
@@ -70,6 +87,12 @@ class Emulator {
 
   void setAudioMuted({required bool muted}) =>
       _bindings.audioSetMuted(_session, muted ? 1 : 0);
+
+  void setAudioDiscard({required bool discard}) =>
+      _bindings.audioSetDiscard(_session, discard ? 1 : 0);
+
+  void setAudioQuality({required int bits, required bool mono}) =>
+      _bindings.audioSetQuality(_session, bits, mono ? 1 : 0);
 
   void setButton(EmulatorButton button, {required bool pressed}) =>
       _bindings.setButton(_session, button.id, pressed ? 1 : 0);
@@ -145,5 +168,6 @@ class Emulator {
     if (_closed) return;
     _closed = true;
     _bindings.close(_session);
+    if (_scratch.existsSync()) _scratch.deleteSync(recursive: true);
   }
 }

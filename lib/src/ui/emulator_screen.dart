@@ -5,6 +5,7 @@ import '../emulator_button.dart';
 import '../emulator_session.dart';
 import 'emulator_skin.dart';
 import 'style_overlay.dart';
+import 'vhs_view.dart';
 import 'emulator_view_model.dart';
 
 final _keyBindings = <LogicalKeyboardKey, EmulatorButton>{
@@ -36,8 +37,13 @@ class EmulatorScreen extends StatefulWidget {
     this.autoPlay = false,
     this.onPairController,
     this.showShelf = true,
+    this.transportLeading,
     super.key,
   });
+
+  /// Sits at the left of the transport row — for controls only the host can
+  /// provide, like save slots that need somewhere to write.
+  final Widget? transportLeading;
 
   /// Hosts that give the collection its own place on screen turn this off.
   final bool showShelf;
@@ -101,6 +107,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
                   viewModel: viewModel,
                   skin: skin,
                   onPairController: widget.onPairController,
+                  transportLeading: widget.transportLeading,
                 ),
               ),
               if (widget.showShelf) ...[
@@ -120,11 +127,13 @@ class _Stage extends StatelessWidget {
     required this.viewModel,
     required this.skin,
     this.onPairController,
+    this.transportLeading,
   });
 
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
   final VoidCallback? onPairController;
+  final Widget? transportLeading;
 
   @override
   Widget build(BuildContext context) {
@@ -138,24 +147,25 @@ class _Stage extends StatelessWidget {
         Expanded(
           child: ColoredBox(
             color: skin.screen(context),
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: session.aspectRatio,
-                child: session.frame == null
-                    ? const SizedBox.expand()
-                    : StyleOverlay(
-                        style: viewModel.style,
-                        sourceWidth: session.frame?.width ?? 0,
-                        sourceHeight: session.frame?.height ?? 0,
-                        child: RawImage(image: session.frame, fit: .contain),
-                      ),
-              ),
+            child: SizedBox.expand(
+              child: switch (session.frame) {
+                  null => const SizedBox.expand(),
+                  final frame when viewModel.style?.shader ?? false =>
+                    VhsView(frame: frame),
+                  final frame => StyleOverlay(
+                    style: viewModel.style,
+                    sourceWidth: frame.width,
+                    sourceHeight: frame.height,
+                    child: RawImage(image: frame, fit: .fill),
+                  ),
+              },
             ),
           ),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
+            if (transportLeading != null) transportLeading ?? const SizedBox(),
             const Spacer(),
             if (onPairController != null)
               skin.button(
@@ -165,20 +175,6 @@ class _Stage extends StatelessWidget {
                 onTap: onPairController ?? () {},
               ),
             if (onPairController != null) const SizedBox(width: 8),
-            skin.button(
-              context,
-              label: 'Save',
-              icon: .save,
-              onTap: viewModel.saveState,
-            ),
-            const SizedBox(width: 8),
-            skin.button(
-              context,
-              label: 'Load',
-              icon: .load,
-              onTap: viewModel.loadState,
-            ),
-            const SizedBox(width: 8),
             skin.button(
               context,
               label: viewModel.style?.label ?? 'Raw',
@@ -195,13 +191,6 @@ class _Stage extends StatelessWidget {
             const SizedBox(width: 8),
             skin.button(
               context,
-              label: viewModel.isPaused ? 'Resume' : 'Pause',
-              icon: viewModel.isPaused ? .play : .pause,
-              onTap: viewModel.togglePause,
-            ),
-            const SizedBox(width: 8),
-            skin.button(
-              context,
               label: viewModel.speed.label,
               icon: .speed,
               onTap: viewModel.cycleSpeed,
@@ -212,6 +201,13 @@ class _Stage extends StatelessWidget {
               label: 'Reset',
               icon: .reset,
               onTap: viewModel.reset,
+            ),
+            const SizedBox(width: 8),
+            skin.button(
+              context,
+              label: viewModel.isPaused ? 'Resume' : 'Pause',
+              icon: viewModel.isPaused ? .play : .pause,
+              onTap: viewModel.togglePause,
             ),
           ],
         ),
