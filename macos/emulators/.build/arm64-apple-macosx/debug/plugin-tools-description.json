@@ -47,7 +47,7 @@
       ],
       "otherArguments" : [
         "-target",
-        "arm64-apple-macosx11.0",
+        "arm64-apple-macosx10.15",
         "-incremental",
         "-enable-batch-mode",
         "-serialize-diagnostics",
@@ -134,7 +134,7 @@
       "-I",
       "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/Modules",
       "-target",
-      "arm64-apple-macosx11.0",
+      "arm64-apple-macosx10.15",
       "-incremental",
       "-enable-batch-mode",
       "-serialize-diagnostics",
