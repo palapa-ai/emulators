@@ -18,7 +18,9 @@ enum SessionStatus { idle, running, unavailable, failed }
 class EmulatorSession extends ChangeNotifier {
   EmulatorSession({this.corePath});
 
-  final String? corePath;
+  /// Discovered after construction when a host did not name one, so the
+  /// screen can render before the lookup finishes.
+  String? corePath;
 
   Emulator? _emulator;
   Timer? _pump;

@@ -3,118 +3,93 @@ import 'package:flutter/widgets.dart';
 
 import '../emulator_button.dart';
 import '../emulator_session.dart';
-import '../rom_file.dart';
-import '../rom_library.dart';
 import 'emulator_skin.dart';
+import 'emulator_view_model.dart';
 
 final _keyBindings = <LogicalKeyboardKey, EmulatorButton>{
-  LogicalKeyboardKey.arrowUp: EmulatorButton.up,
-  LogicalKeyboardKey.arrowDown: EmulatorButton.down,
-  LogicalKeyboardKey.arrowLeft: EmulatorButton.left,
-  LogicalKeyboardKey.arrowRight: EmulatorButton.right,
-  LogicalKeyboardKey.keyZ: EmulatorButton.b,
-  LogicalKeyboardKey.keyX: EmulatorButton.a,
-  LogicalKeyboardKey.keyA: EmulatorButton.y,
-  LogicalKeyboardKey.keyS: EmulatorButton.x,
-  LogicalKeyboardKey.keyQ: EmulatorButton.l,
-  LogicalKeyboardKey.keyW: EmulatorButton.r,
-  LogicalKeyboardKey.enter: EmulatorButton.start,
-  LogicalKeyboardKey.shiftRight: EmulatorButton.select,
+  .arrowUp: .up,
+  .arrowDown: .down,
+  .arrowLeft: .left,
+  .arrowRight: .right,
+  .keyZ: .b,
+  .keyX: .a,
+  .keyA: .y,
+  .keyS: .x,
+  .keyQ: .l,
+  .keyW: .r,
+  .enter: .start,
+  .shiftRight: .select,
 };
 
 /// The whole feature: the running game over the shelf it came from.
 ///
 /// Everything it draws goes through [EmulatorSkin], so a host restyles it by
-/// wrapping this in an [EmulatorTheme] rather than rebuilding the screen.
+/// wrapping this in an [EmulatorTheme] rather than rebuilding the screen. Pass
+/// a [viewModel] to drive it from outside — adding cartridges, say — otherwise
+/// it owns one.
 class EmulatorScreen extends StatefulWidget {
-  const EmulatorScreen({this.corePath, this.libraryRoot, super.key});
+  const EmulatorScreen({
+    this.viewModel,
+    this.corePath,
+    this.libraryRoot,
+    super.key,
+  });
 
+  final EmulatorViewModel? viewModel;
   final String? corePath;
   final String? libraryRoot;
 
   @override
-  State<EmulatorScreen> createState() => EmulatorScreenState();
+  State<EmulatorScreen> createState() => _EmulatorScreenState();
 }
 
-class EmulatorScreenState extends State<EmulatorScreen> {
-  EmulatorSession? _session;
-  RomLibrary? _library;
-  List<RomFile> _roms = const [];
+class _EmulatorScreenState extends State<EmulatorScreen> {
+  EmulatorViewModel? _owned;
 
-  @override
-  void initState() {
-    super.initState();
-    _session = EmulatorSession(corePath: widget.corePath)
-      ..addListener(_onSessionChanged);
-    _library = RomLibrary(rootPath: widget.libraryRoot);
-    refresh();
-  }
-
-  void _onSessionChanged() {
-    if (mounted) setState(() {});
-  }
-
-  /// Hosts that add cartridges their own way (a drop target, a file picker)
-  /// call these after the folder changes.
-  Future<void> refresh() async {
-    final roms = await _library?.load() ?? const <RomFile>[];
-    if (mounted) setState(() => _roms = roms);
-  }
-
-  Future<void> addFiles(Iterable<String> paths) async {
-    final roms = await _library?.add(paths) ?? const <RomFile>[];
-    if (mounted) setState(() => _roms = roms);
-  }
-
-  Future<void> _remove(RomFile rom) async {
-    if (_session?.rom == rom) _session?.stop();
-    final roms = await _library?.remove(rom) ?? const <RomFile>[];
-    if (mounted) setState(() => _roms = roms);
-  }
+  EmulatorViewModel get _viewModel =>
+      widget.viewModel ??
+      (_owned ??= EmulatorViewModel(
+        corePath: widget.corePath,
+        libraryRoot: widget.libraryRoot,
+      ));
 
   @override
   void dispose() {
-    _session?.removeListener(_onSessionChanged);
-    _session?.dispose();
+    _owned?.dispose();
     super.dispose();
   }
 
   KeyEventResult _onKey(FocusNode _, KeyEvent event) {
     final button = _keyBindings[event.logicalKey];
-    if (button == null) return KeyEventResult.ignored;
-    if (event is KeyRepeatEvent) return KeyEventResult.handled;
+    if (button == null) return .ignored;
+    if (event is KeyRepeatEvent) return .handled;
 
-    _session?.press(button, pressed: event is KeyDownEvent);
-    return KeyEventResult.handled;
+    _viewModel.press(button, pressed: event is KeyDownEvent);
+    return .handled;
   }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = _viewModel;
     final skin = EmulatorTheme.of(context);
-    final session = _session;
 
     return Focus(
       autofocus: true,
       onKeyEvent: _onKey,
       child: ColoredBox(
         color: skin.background(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: session == null
-                  ? const SizedBox.shrink()
-                  : _Stage(session: session, skin: skin),
-            ),
-            const SizedBox(height: 16),
-            _Shelf(
-              roms: _roms,
-              playing: session?.rom,
-              skin: skin,
-              onPlay: (rom) => session?.play(rom),
-              onRemove: _remove,
-            ),
-          ],
+        child: ListenableBuilder(
+          listenable: viewModel,
+          builder: (context, _) => Column(
+            crossAxisAlignment: .stretch,
+            children: [
+              Expanded(
+                child: _Stage(viewModel: viewModel, skin: skin),
+              ),
+              const SizedBox(height: 16),
+              _Shelf(viewModel: viewModel, skin: skin),
+            ],
+          ),
         ),
       ),
     );
@@ -122,15 +97,17 @@ class EmulatorScreenState extends State<EmulatorScreen> {
 }
 
 class _Stage extends StatelessWidget {
-  const _Stage({required this.session, required this.skin});
+  const _Stage({required this.viewModel, required this.skin});
 
-  final EmulatorSession session;
+  final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
 
   @override
   Widget build(BuildContext context) {
-    final rom = session.rom;
-    if (rom == null) return _Idle(session: session, skin: skin);
+    final rom = viewModel.playing;
+    if (rom == null) return _Idle(viewModel: viewModel, skin: skin);
+
+    final session = viewModel.session;
 
     return Column(
       children: [
@@ -142,7 +119,7 @@ class _Stage extends StatelessWidget {
                 aspectRatio: session.aspectRatio,
                 child: session.frame == null
                     ? const SizedBox.expand()
-                    : RawImage(image: session.frame, fit: BoxFit.contain),
+                    : RawImage(image: session.frame, fit: .contain),
               ),
             ),
           ),
@@ -150,11 +127,11 @@ class _Stage extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            skin.text(context, rom.title, role: EmulatorTextRole.heading),
+            skin.text(context, rom.title, role: .heading),
             const Spacer(),
-            skin.button(context, label: 'Reset', onTap: session.reset),
+            skin.button(context, label: 'Reset', onTap: viewModel.reset),
             const SizedBox(width: 8),
-            skin.button(context, label: 'Eject', onTap: session.stop),
+            skin.button(context, label: 'Eject', onTap: viewModel.stop),
           ],
         ),
       ],
@@ -163,55 +140,43 @@ class _Stage extends StatelessWidget {
 }
 
 class _Idle extends StatelessWidget {
-  const _Idle({required this.session, required this.skin});
+  const _Idle({required this.viewModel, required this.skin});
 
-  final EmulatorSession session;
+  final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
 
   @override
   Widget build(BuildContext context) {
-    final message = switch (session.status) {
+    final message = switch (viewModel.status) {
       SessionStatus.unavailable =>
         'No emulator core is bundled for this platform',
-      SessionStatus.failed => session.error ?? 'That cartridge would not load',
+      SessionStatus.failed =>
+        viewModel.session.error ?? 'That cartridge would not load',
       _ => 'Pick a cartridge below',
     };
 
-    return Center(
-      child: skin.text(context, message, role: EmulatorTextRole.caption),
-    );
+    return Center(child: skin.text(context, message, role: .caption));
   }
 }
 
 class _Shelf extends StatelessWidget {
-  const _Shelf({
-    required this.roms,
-    required this.playing,
-    required this.skin,
-    required this.onPlay,
-    required this.onRemove,
-  });
+  const _Shelf({required this.viewModel, required this.skin});
 
-  final List<RomFile> roms;
-  final RomFile? playing;
+  final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
-  final void Function(RomFile) onPlay;
-  final void Function(RomFile) onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final roms = viewModel.roms;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         Row(
           children: [
-            skin.text(context, 'Collection', role: EmulatorTextRole.heading),
+            skin.text(context, 'Collection', role: .heading),
             const SizedBox(width: 8),
-            skin.text(
-              context,
-              '${roms.length}',
-              role: EmulatorTextRole.caption,
-            ),
+            skin.text(context, '${roms.length}', role: .caption),
           ],
         ),
         const SizedBox(height: 8),
@@ -222,20 +187,20 @@ class _Shelf extends StatelessWidget {
                   child: skin.text(
                     context,
                     'No cartridges yet',
-                    role: EmulatorTextRole.caption,
+                    role: .caption,
                   ),
                 )
               : ListView.separated(
-                  scrollDirection: Axis.horizontal,
+                  scrollDirection: .horizontal,
                   itemCount: roms.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (_, i) => skin.cartridge(
                     context,
                     title: roms[i].title,
                     subtitle: roms[i].sizeLabel,
-                    playing: roms[i] == playing,
-                    onTap: () => onPlay(roms[i]),
-                    onRemove: () => onRemove(roms[i]),
+                    playing: roms[i] == viewModel.playing,
+                    onTap: () => viewModel.play(roms[i]),
+                    onRemove: () => viewModel.remove(roms[i]),
                   ),
                 ),
         ),
