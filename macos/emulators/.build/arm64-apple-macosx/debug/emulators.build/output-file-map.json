@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/emulators.build/primary.swiftdeps"
+  },
+  "/Users/saad/dev/palapa-ai/emulators/macos/emulators/Sources/emulators/EmulatorsPlugin.swift": {
+    "dependencies": "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/emulators.build/EmulatorsPlugin.d",
+    "object": "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/emulators.build/EmulatorsPlugin.swift.o",
+    "swiftmodule": "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/emulators.build/EmulatorsPlugin~partial.swiftmodule",
+    "swift-dependencies": "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/emulators.build/EmulatorsPlugin.swiftdeps",
+    "diagnostics": "/Users/saad/dev/palapa-ai/emulators/macos/emulators/.build/arm64-apple-macosx/debug/emulators.build/EmulatorsPlugin.dia"
+  }
+}
