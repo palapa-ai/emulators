@@ -51,6 +51,9 @@ typedef EmuStateIo = int Function(Pointer<EmuSession>, Pointer<Void>, int);
 typedef _SramDataNative = Pointer<Void> Function(Pointer<EmuSession>);
 typedef EmuSramData = Pointer<Void> Function(Pointer<EmuSession>);
 
+typedef _IntFromSessionNative = Int Function(Pointer<EmuSession>);
+typedef EmuIntFromSession = int Function(Pointer<EmuSession>);
+
 /// Thin `dart:ffi` surface over `src/libretro_host.c`. Holds no policy — the
 /// decisions live in [Emulator].
 class LibretroBindings {
@@ -109,7 +112,17 @@ class LibretroBindings {
       ),
       sramData = lib.lookupFunction<_SramDataNative, EmuSramData>(
         'emu_sram_data',
-      );
+      ),
+      audioStart = lib.lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
+        'emu_audio_start',
+      ),
+      audioStop = lib.lookupFunction<_VoidSessionNative, EmuVoidSession>(
+        'emu_audio_stop',
+      ),
+      audioQueued = lib
+          .lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
+            'emu_audio_queued',
+          );
 
   /// Apple builds link the plugin statically into the app binary, so the
   /// symbols are already in the process and there is no library to open.
@@ -140,4 +153,7 @@ class LibretroBindings {
   final EmuStateIo stateLoad;
   final EmuSizeSession sramSize;
   final EmuSramData sramData;
+  final EmuIntFromSession audioStart;
+  final EmuVoidSession audioStop;
+  final EmuIntFromSession audioQueued;
 }

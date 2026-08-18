@@ -1,6 +1,8 @@
 #include "libretro_host.h"
 
+#include <AudioToolbox/AudioToolbox.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <libretro.h>
 #include <stdbool.h>
@@ -8,7 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define AUDIO_CAPACITY 65536
+/* A quarter second of slack at SNES rates: enough that a late frame does not
+   click, short enough that input does not lag behind the picture. */
+#define AUDIO_RING_FRAMES 8192
+#define AUDIO_BUFFER_FRAMES 512
+#define AUDIO_BUFFER_COUNT 3
 
 struct EmuSession {
    void *lib;
@@ -40,7 +46,9 @@ struct EmuSession {
    int frame_w, frame_h, pixel_capacity;
 
    int16_t *audio;
-   int audio_count;
+   int audio_read, audio_write;
+   pthread_mutex_t audio_lock;
+   AudioQueueRef audio_queue;
 
    int16_t buttons[EMU_BUTTON_COUNT];
 
@@ -164,20 +172,70 @@ static void cb_video(const void *data, unsigned width, unsigned height,
    }
 }
 
+static int ring_filled(const EmuSession *s)
+{
+   int n = s->audio_write - s->audio_read;
+   return n < 0 ? n + AUDIO_RING_FRAMES : n;
+}
+
+/* Caller holds audio_lock. Oldest audio wins: dropping the newest frames on
+   overrun keeps what is already scheduled to play intact. */
+static void ring_write(EmuSession *s, const int16_t *data, int frames)
+{
+   int room = AUDIO_RING_FRAMES - 1 - ring_filled(s);
+   int take = frames < room ? frames : room;
+
+   for (int i = 0; i < take; i++)
+   {
+      s->audio[(size_t)s->audio_write * 2] = data[(size_t)i * 2];
+      s->audio[(size_t)s->audio_write * 2 + 1] = data[(size_t)i * 2 + 1];
+      s->audio_write = (s->audio_write + 1) % AUDIO_RING_FRAMES;
+   }
+}
+
+static int ring_read(EmuSession *s, int16_t *out, int frames)
+{
+   int have = ring_filled(s);
+   int take = frames < have ? frames : have;
+
+   for (int i = 0; i < take; i++)
+   {
+      out[(size_t)i * 2] = s->audio[(size_t)s->audio_read * 2];
+      out[(size_t)i * 2 + 1] = s->audio[(size_t)s->audio_read * 2 + 1];
+      s->audio_read = (s->audio_read + 1) % AUDIO_RING_FRAMES;
+   }
+
+   return take;
+}
+
 static void push_audio(const int16_t *data, size_t frames)
 {
    if (!active)
       return;
 
-   int room = AUDIO_CAPACITY / 2 - active->audio_count;
-   int take = (int)frames < room ? (int)frames : room;
+   pthread_mutex_lock(&active->audio_lock);
+   ring_write(active, data, (int)frames);
+   pthread_mutex_unlock(&active->audio_lock);
+}
 
-   if (take <= 0)
-      return;
+/* Underrun plays silence rather than stalling the device — a gap is far less
+   audible than the queue starving and restarting. */
+static void audio_callback(void *user, AudioQueueRef queue,
+      AudioQueueBufferRef buffer)
+{
+   EmuSession *s = user;
+   int16_t *out = buffer->mAudioData;
 
-   memcpy(active->audio + (size_t)active->audio_count * 2, data,
-         (size_t)take * 4);
-   active->audio_count += take;
+   pthread_mutex_lock(&s->audio_lock);
+   int got = ring_read(s, out, AUDIO_BUFFER_FRAMES);
+   pthread_mutex_unlock(&s->audio_lock);
+
+   if (got < AUDIO_BUFFER_FRAMES)
+      memset(out + (size_t)got * 2, 0,
+            (size_t)(AUDIO_BUFFER_FRAMES - got) * 4);
+
+   buffer->mAudioDataByteSize = AUDIO_BUFFER_FRAMES * 4;
+   AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);
 }
 
 static size_t cb_audio_batch(const int16_t *data, size_t frames)
@@ -272,7 +330,8 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
       return NULL;
    }
 
-   s->audio = malloc(AUDIO_CAPACITY * sizeof(int16_t));
+   pthread_mutex_init(&s->audio_lock, NULL);
+   s->audio = malloc((size_t)AUDIO_RING_FRAMES * 2 * sizeof(int16_t));
    if (!s->audio)
    {
       fail(err, err_len, "out of memory");
@@ -333,6 +392,8 @@ void emu_close(EmuSession *s)
    if (!s)
       return;
 
+   emu_audio_stop(s);
+
    if (s->unload_game)
       s->unload_game();
    if (s->deinit)
@@ -347,6 +408,7 @@ void emu_close(EmuSession *s)
    if (active == s)
       active = NULL;
 
+   pthread_mutex_destroy(&s->audio_lock);
    free(s);
 }
 
@@ -365,15 +427,71 @@ int emu_audio_read(EmuSession *s, int16_t *out, int max_frames)
    if (!s || !out || max_frames <= 0)
       return 0;
 
-   int take = s->audio_count < max_frames ? s->audio_count : max_frames;
-   memcpy(out, s->audio, (size_t)take * 4);
-
-   int left = s->audio_count - take;
-   if (left > 0)
-      memmove(s->audio, s->audio + (size_t)take * 2, (size_t)left * 4);
-
-   s->audio_count = left;
+   pthread_mutex_lock(&s->audio_lock);
+   int take = ring_read(s, out, max_frames);
+   pthread_mutex_unlock(&s->audio_lock);
    return take;
+}
+
+int emu_audio_queued(EmuSession *s)
+{
+   if (!s)
+      return 0;
+
+   pthread_mutex_lock(&s->audio_lock);
+   int filled = ring_filled(s);
+   pthread_mutex_unlock(&s->audio_lock);
+   return filled;
+}
+
+int emu_audio_start(EmuSession *s)
+{
+   if (!s || s->audio_queue)
+      return s ? 0 : 1;
+
+   AudioStreamBasicDescription format = {
+      .mSampleRate = s->av.timing.sample_rate > 0
+            ? s->av.timing.sample_rate : 32040.0,
+      .mFormatID = kAudioFormatLinearPCM,
+      .mFormatFlags = kAudioFormatFlagIsSignedInteger
+            | kAudioFormatFlagIsPacked,
+      .mFramesPerPacket = 1,
+      .mChannelsPerFrame = 2,
+      .mBitsPerChannel = 16,
+      .mBytesPerFrame = 4,
+      .mBytesPerPacket = 4,
+   };
+
+   if (AudioQueueNewOutput(&format, audio_callback, s, NULL, NULL, 0,
+            &s->audio_queue) != noErr)
+   {
+      s->audio_queue = NULL;
+      return 1;
+   }
+
+   for (int i = 0; i < AUDIO_BUFFER_COUNT; i++)
+   {
+      AudioQueueBufferRef buffer;
+      if (AudioQueueAllocateBuffer(s->audio_queue, AUDIO_BUFFER_FRAMES * 4,
+               &buffer) != noErr)
+         continue;
+
+      memset(buffer->mAudioData, 0, AUDIO_BUFFER_FRAMES * 4);
+      buffer->mAudioDataByteSize = AUDIO_BUFFER_FRAMES * 4;
+      AudioQueueEnqueueBuffer(s->audio_queue, buffer, 0, NULL);
+   }
+
+   return AudioQueueStart(s->audio_queue, NULL) == noErr ? 0 : 1;
+}
+
+void emu_audio_stop(EmuSession *s)
+{
+   if (!s || !s->audio_queue)
+      return;
+
+   AudioQueueStop(s->audio_queue, true);
+   AudioQueueDispose(s->audio_queue, true);
+   s->audio_queue = NULL;
 }
 
 void emu_set_button(EmuSession *s, int button, int pressed)

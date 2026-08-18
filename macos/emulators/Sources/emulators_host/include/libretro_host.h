@@ -37,8 +37,18 @@ EMU_API const uint32_t *emu_frame_pixels(EmuSession *s);
 EMU_API int emu_frame_width(EmuSession *s);
 EMU_API int emu_frame_height(EmuSession *s);
 
-/* Drains up to max_frames stereo frames; returns how many were written. */
+/* Drains up to max_frames stereo frames; returns how many were written.
+   For hosts doing their own playback — emu_audio_start drains it instead. */
 EMU_API int emu_audio_read(EmuSession *s, int16_t *out, int max_frames);
+
+/* Plays the core's output through the system device; 0 on success. */
+EMU_API int emu_audio_start(EmuSession *s);
+EMU_API void emu_audio_stop(EmuSession *s);
+
+/* Stereo frames still waiting to play. Pace emulation on this — running a
+   frame only while the backlog is short keeps the console's clock honest
+   without a timer that drifts against the audio device. */
+EMU_API int emu_audio_queued(EmuSession *s);
 
 EMU_API void emu_set_button(EmuSession *s, int button, int pressed);
 EMU_API void emu_reset(EmuSession *s);

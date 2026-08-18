@@ -26,6 +26,12 @@ class EmulatorSession extends ChangeNotifier {
   Timer? _pump;
   bool _decoding = false;
 
+  /// Roughly three frames of sound in hand — enough to ride out a slow decode,
+  /// short enough that a button press is not heard late.
+  int get _targetBacklogFrames =>
+      ((_emulator?.sampleRate ?? 32040) / (_emulator?.framesPerSecond ?? 60) * 3)
+          .round();
+
   SessionStatus _status = SessionStatus.idle;
   RomFile? _rom;
   ui.Image? _frame;
@@ -63,9 +69,12 @@ class EmulatorSession extends ChangeNotifier {
       return;
     }
 
-    final fps = _emulator?.framesPerSecond ?? 60;
+    _emulator?.startAudio();
+
+    // Woken far faster than frame rate; _tick decides whether to actually run
+    // one, so the audio device sets the pace instead of this timer.
     _pump = Timer.periodic(
-      Duration(microseconds: (1000000 / fps).round()),
+      const Duration(milliseconds: 2),
       (_) => unawaited(_tick()),
     );
     notifyListeners();
@@ -74,6 +83,7 @@ class EmulatorSession extends ChangeNotifier {
   void stop() {
     _pump?.cancel();
     _pump = null;
+    _emulator?.stopAudio();
     _emulator?.close();
     _emulator = null;
     _rom = null;
@@ -87,11 +97,13 @@ class EmulatorSession extends ChangeNotifier {
   void press(EmulatorButton button, {required bool pressed}) =>
       _emulator?.setButton(button, pressed: pressed);
 
-  /// Decoding off the timer means a slow frame is dropped rather than queued
-  /// behind work the core has already moved past.
+  /// Runs only while the sound card is short of work. Pacing on the backlog
+  /// rather than a wall clock means the emulator cannot drift against the
+  /// device, which is what makes audio crackle or slowly desynchronise.
   Future<void> _tick() async {
     final emulator = _emulator;
     if (emulator == null || _decoding) return;
+    if (emulator.queuedAudioFrames >= _targetBacklogFrames) return;
 
     _decoding = true;
     try {
