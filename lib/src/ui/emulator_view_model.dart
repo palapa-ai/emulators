@@ -29,7 +29,7 @@ class EmulatorViewModel extends ChangeNotifier {
   final bool autoPlay;
   bool _autoPlayed = false;
 
-  final RomLibrary _library;
+  RomLibrary _library;
   final CoreLibrary _cores;
   final EmulatorSession session;
 
@@ -43,6 +43,14 @@ class EmulatorViewModel extends ChangeNotifier {
     session.corePath = await _cores.first();
     _maybeAutoPlay();
     notifyListeners();
+  }
+
+  /// Point the shelf at a different folder — a host that keeps cartridges in
+  /// its own document store resolves that path asynchronously, after this
+  /// view model already exists.
+  Future<void> useRomLibrary(String rootPath) async {
+    _library = RomLibrary(rootPath: rootPath);
+    await refresh();
   }
 
   Future<void> refresh() async {
