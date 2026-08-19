@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
@@ -25,7 +26,7 @@ class Emulator {
     this._session,
     this.corePath,
     this.romPath,
-    this._scratch,
+    this._isolated,
   );
 
   /// Each session dlopens its **own copy** of the core. libretro keeps its
@@ -34,9 +35,7 @@ class Emulator {
   /// first one's memory.
   static Emulator open({required String corePath, required String romPath}) {
     final bindings = LibretroBindings.open();
-    final scratch = Directory.systemTemp.createTempSync('emulator_core');
-    final isolated = '${scratch.path}/core.dylib';
-    File(corePath).copySync(isolated);
+    final isolated = _CoreCopies.take(corePath);
 
     final core = isolated.toNative();
     final rom = romPath.toNative();
@@ -45,10 +44,10 @@ class Emulator {
     try {
       final session = bindings.open(core, rom, err, 512);
       if (session == nullptr) {
-        scratch.deleteSync(recursive: true);
+        _CoreCopies.discard(isolated);
         throw EmulatorException(err.toDart());
       }
-      return Emulator._(bindings, session, corePath, romPath, scratch);
+      return Emulator._(bindings, session, corePath, romPath, isolated);
     } finally {
       release(core);
       release(rom);
@@ -60,7 +59,7 @@ class Emulator {
   final Pointer<EmuSession> _session;
   final String corePath;
   final String romPath;
-  final Directory _scratch;
+  final String _isolated;
 
   bool _closed = false;
 
@@ -167,6 +166,43 @@ class Emulator {
     if (_closed) return;
     _closed = true;
     _bindings.close(_session);
-    if (_scratch.existsSync()) _scratch.deleteSync(recursive: true);
+    _CoreCopies.discard(_isolated);
+  }
+}
+
+/// Hands out a fresh on-disk copy of a core for every [Emulator.open].
+///
+/// A copy is never reused: `dlclose` is not guaranteed to unload on macOS, so
+/// a second `dlopen` of the same path could hand back the first game's dirty
+/// globals. Spares are cut in the background instead, because the copy used to
+/// happen inline and scrolling the shelf meant megabytes of blocking I/O.
+class _CoreCopies {
+  static final _root = Directory.systemTemp.createTempSync('emulator_cores');
+  static final _ready = <String, List<String>>{};
+  static var _next = 0;
+  static const _spares = 4;
+
+  static String take(String corePath) {
+    final ready = _ready[corePath] ??= <String>[];
+    final copy = ready.isEmpty ? _cut(corePath) : ready.removeLast();
+    unawaited(_topUp(corePath));
+    return copy;
+  }
+
+  static void discard(String copy) => unawaited(File(copy).delete());
+
+  static String _cut(String corePath) {
+    final copy = '${_root.path}/core${_next++}.dylib';
+    File(corePath).copySync(copy);
+    return copy;
+  }
+
+  static Future<void> _topUp(String corePath) async {
+    final ready = _ready[corePath] ??= <String>[];
+    while (ready.length < _spares) {
+      final copy = '${_root.path}/core${_next++}.dylib';
+      await File(corePath).copy(copy);
+      ready.add(copy);
+    }
   }
 }

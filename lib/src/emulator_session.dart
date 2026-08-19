@@ -37,7 +37,7 @@ class EmulatorSession extends ChangeNotifier {
   /// looking at closely.
   final bool preview;
 
-  static const previewFps = 12;
+  static const previewFps = 60;
 
   /// Discovered after construction when a host did not name one, so the
   /// screen can render before the lookup finishes.
@@ -45,6 +45,8 @@ class EmulatorSession extends ChangeNotifier {
 
   Emulator? _emulator;
   Timer? _pump;
+  Timer? _stagger;
+  static var _started = 0;
   Timer? _input;
   bool _decoding = false;
 
@@ -100,33 +102,35 @@ class EmulatorSession extends ChangeNotifier {
   EmulatorSpeed _speed = EmulatorSpeed.normal;
   final _clock = Stopwatch();
   RomFile? _rom;
-  ui.Image? _frame;
+  /// Frames are published apart from the rest of the state: a new picture
+  /// arrives 60 times a second, and everything watching this session for a
+  /// status change has no business rebuilding at that rate.
+  final frames = ValueNotifier<ui.Image?>(null);
+  ui.Image? _stale;
   String? _error;
 
   SessionStatus get status => _status;
   RomFile? get rom => _rom;
-  ui.Image? get frame => _frame;
+  ui.Image? get frame => frames.value;
   String? get error => _error;
 
   bool get isRunning => _emulator != null;
   bool get isPaused => _paused;
   EmulatorSpeed get speed => _speed;
 
-  /// Off 1x the audio device can no longer be the clock — it drains at one
-  /// rate only — so wall time takes over and the sound is muted to avoid
-  /// playing back at the wrong pitch.
+  /// Off 1x wall time takes over as the clock, since the audio device drains
+  /// at one rate only. The sound is kept on at every speed regardless, so it
+  /// plays back at the pitch the core hands over.
   void cycleSpeed() {
     final next =
         EmulatorSpeed.values[(_speed.index + 1) % EmulatorSpeed.values.length];
     _speed = next;
-    // Off-speed the device can no longer be the clock, so the samples have
-    // nowhere to go — discarding them is what keeps it from crackling.
-    _emulator?.setAudioDiscard(discard: next != EmulatorSpeed.normal);
-    _emulator?.setAudioMuted(muted: next != EmulatorSpeed.normal);
+    _emulator?.setAudioDiscard(discard: false);
+    _emulator?.setAudioMuted(muted: false);
     _clock
       ..reset()
       ..start();
-    log('speed ${next.label}');
+    log('${next.label} speed');
     notifyListeners();
   }
   double get aspectRatio => _emulator?.aspectRatio ?? 4 / 3;
@@ -172,14 +176,32 @@ class EmulatorSession extends ChangeNotifier {
 
     // Woken far faster than frame rate; _tick decides whether to actually run
     // one, so the audio device sets the pace instead of this timer.
-    _pump = Timer.periodic(
-      const Duration(milliseconds: 2),
-      (_) => unawaited(_tick()),
-    );
-    _input ??= Timer.periodic(
-      const Duration(milliseconds: 8),
-      (_) => _applyInput(),
-    );
+    if (preview) {
+      // Started together, every preview would land its frame on the same
+      // millisecond and the shelf would beat against the game. Spreading the
+      // first tick across the interval keeps the cost flat.
+      const interval = 1000 ~/ previewFps;
+      _stagger = Timer(
+        Duration(milliseconds: (_started++ * 7) % interval),
+        () => _pump = Timer.periodic(
+          const Duration(milliseconds: interval),
+          (_) => unawaited(_tick()),
+        ),
+      );
+    } else {
+      _pump = Timer.periodic(
+        const Duration(milliseconds: 2),
+        (_) => unawaited(_tick()),
+      );
+    }
+    // Nothing plays a preview, so it never reads the pad — polling one per
+    // shelf card was the bulk of the input cost.
+    if (!preview) {
+      _input ??= Timer.periodic(
+        const Duration(milliseconds: 8),
+        (_) => _applyInput(),
+      );
+    }
     notifyListeners();
   }
 
@@ -191,13 +213,15 @@ class EmulatorSession extends ChangeNotifier {
     _lastRaw = 0;
     _buttonLog.clear();
     _padLog.clear();
+    _stagger?.cancel();
+    _stagger = null;
     _pump?.cancel();
     _pump = null;
     _emulator?.stopAudio();
     _emulator?.close();
     _emulator = null;
     _rom = null;
-    _frame = null;
+    frames.value = null;
     if (_status == SessionStatus.running) _status = SessionStatus.idle;
     notifyListeners();
   }
@@ -234,15 +258,16 @@ class EmulatorSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Naming the slot is the caller's job, so success is logged there.
   Uint8List? saveState() {
     final state = _emulator?.saveState();
-    log(state == null ? 'save failed' : 'saved ${state.length} bytes');
+    if (state == null) log('save failed');
     return state;
   }
 
   bool loadState(Uint8List state) {
     final ok = _emulator?.loadState(state) ?? false;
-    log(ok ? 'loaded state' : 'load failed');
+    if (!ok) log('load failed');
     return ok;
   }
 
@@ -317,10 +342,7 @@ class EmulatorSession extends ChangeNotifier {
     if (emulator == null || _decoding || _paused) return;
 
     if (preview) {
-      if (_clock.elapsedMilliseconds < 1000 ~/ previewFps) return;
-      _clock
-        ..reset()
-        ..start();
+      // Paced by the pump itself.
     } else if (_speed == EmulatorSpeed.normal) {
       if (emulator.queuedAudioFrames >= _targetBacklogFrames) return;
     } else {
@@ -347,10 +369,14 @@ class EmulatorSession extends ChangeNotifier {
         height,
         ui.PixelFormat.bgra8888,
         completer.complete,
+        targetWidth: preview ? width ~/ 2 : null,
+        targetHeight: preview ? height ~/ 2 : null,
       );
 
-      _frame = await completer.future;
-      notifyListeners();
+      final stale = _stale;
+      _stale = frames.value;
+      frames.value = await completer.future;
+      stale?.dispose();
     } finally {
       _decoding = false;
     }
@@ -359,6 +385,7 @@ class EmulatorSession extends ChangeNotifier {
   @override
   void dispose() {
     stop();
+    frames.dispose();
     super.dispose();
   }
 }

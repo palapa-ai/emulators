@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -150,18 +152,29 @@ class _Stage extends StatelessWidget {
               color: skin.screen(context),
               border: Border.all(color: skin.line(context)),
             ),
-            child: SizedBox.expand(
-              child: switch (session.frame) {
-                  null => const SizedBox.expand(),
-                  final frame when viewModel.style?.shader ?? false =>
-                    VhsView(frame: frame),
-                  final frame => StyleOverlay(
-                    style: viewModel.style,
-                    sourceWidth: frame.width,
-                    sourceHeight: frame.height,
-                    child: RawImage(image: frame, fit: .fill),
-                  ),
-              },
+            // The picture is the only thing arriving at frame rate, so it
+            // repaints on its own rather than with the rest of the screen.
+            child: RepaintBoundary(
+              child: ValueListenableBuilder<ui.Image?>(
+                valueListenable: session.frames,
+                builder: (context, frame, _) => SizedBox.expand(
+                  child: switch (frame) {
+                    null => const SizedBox.expand(),
+                    final frame when viewModel.style?.shader ?? false =>
+                      VhsView(frame: frame),
+                    final frame => StyleOverlay(
+                      style: viewModel.style,
+                      sourceWidth: frame.width,
+                      sourceHeight: frame.height,
+                      child: RawImage(
+                        image: frame,
+                        fit: .fill,
+                        filterQuality: .none,
+                      ),
+                    ),
+                  },
+                ),
+              ),
             ),
           ),
         ),

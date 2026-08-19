@@ -70,19 +70,25 @@ class EmulatorSkin {
     required String label,
     required VoidCallback onTap,
     EmulatorIcon? icon,
-  }) => GestureDetector(
+  }) => _Hoverable(
     onTap: onTap,
-    child: Container(
-      padding: EdgeInsets.symmetric(horizontal: icon == null ? 12 : 8, vertical: 7),
+    builder: (hovered) => Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: icon == null ? 12 : 8,
+        vertical: 7,
+      ),
       decoration: BoxDecoration(
-        border: Border.all(color: line(context)),
+        color: hovered ? accent(context).withValues(alpha: 0.12) : null,
+        border: Border.all(color: hovered ? accent(context) : line(context)),
         borderRadius: BorderRadius.circular(5),
       ),
       child: icon == null
           ? text(context, label, role: EmulatorTextRole.caption)
           : EmulatorGlyph(
               icon,
-              color: textStyle(context, EmulatorTextRole.caption).color,
+              color: hovered
+                  ? accent(context)
+                  : textStyle(context, EmulatorTextRole.caption).color,
             ),
     ),
   );
@@ -95,6 +101,7 @@ class EmulatorSkin {
     required String title,
     required Widget child,
     List<Widget> trailing = const [],
+    bool fill = false,
   }) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
@@ -112,7 +119,9 @@ class EmulatorSkin {
           ],
         ),
         const SizedBox(height: 8),
-        child,
+        // Only a panel the caller gave a bounded height may take the slack;
+        // a flex child in a wrap-content column would assert.
+        if (fill) Expanded(child: child) else child,
       ],
     ),
   );
@@ -157,4 +166,26 @@ class EmulatorTheme extends InheritedWidget {
 
   @override
   bool updateShouldNotify(EmulatorTheme oldWidget) => skin != oldWidget.skin;
+}
+
+class _Hoverable extends StatefulWidget {
+  const _Hoverable({required this.onTap, required this.builder});
+
+  final VoidCallback onTap;
+  final Widget Function(bool hovered) builder;
+
+  @override
+  State<_Hoverable> createState() => _HoverableState();
+}
+
+class _HoverableState extends State<_Hoverable> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => _hovered = true),
+    onExit: (_) => setState(() => _hovered = false),
+    child: GestureDetector(onTap: widget.onTap, child: widget.builder(_hovered)),
+  );
 }

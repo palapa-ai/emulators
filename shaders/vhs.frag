@@ -5,9 +5,23 @@ precision mediump float;
 
 uniform vec2 uSize;
 uniform float uTime;
+uniform vec2 uSource;
 uniform sampler2D uTexture;
 
 out vec4 fragColor;
+
+// VHS records colour on a separate, far narrower channel than brightness, so
+// the two are split here and blurred by different amounts. Offsetting the red
+// and blue channels instead only ever reads as a lens artefact.
+const mat3 RGB_TO_YIQ = mat3(
+  0.299,  0.596,  0.211,
+  0.587, -0.274, -0.523,
+  0.114, -0.322,  0.312);
+
+const mat3 YIQ_TO_RGB = mat3(
+  1.0,    1.0,    1.0,
+  0.956, -0.272, -1.106,
+  0.621, -0.647,  1.703);
 
 float hash(vec2 p) {
   return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -24,11 +38,16 @@ void main() {
   // slides. A pattern that scrolls reads as a texture laid over the picture,
   // which is the one thing tape never looks like.
   float field = floor(uTime * 50.0);
+  float line = floor(uv.y * uSource.y);
 
   // Head switching: the drum leaves the tape near the bottom, so the last
   // few lines tear sideways and lose sync.
   float switchZone = smoothstep(0.035, 0.0, uv.y);
-  float tear = (hash(vec2(field, floor(uv.y * uSize.y))) - 0.5) * switchZone * 0.05;
+  float tear = (hash(vec2(field, line)) - 0.5) * switchZone * 0.05;
+
+  // Time-base error. A capstan cannot hold a line to the microsecond, so each
+  // one starts a hair early or late — the picture shivers rather than sways.
+  float jitter = (hash(vec2(line, field * 3.7)) - 0.5) * 0.0015;
 
   // Tracking wobble, drifting down the picture rather than shaking as a whole.
   float wobble = sin(uv.y * 11.0 + uTime * 1.6) * 0.0011
@@ -36,47 +55,78 @@ void main() {
 
   float bandPos = fract(uTime * 0.11);
   float band = smoothstep(0.05, 0.0, abs(uv.y - bandPos));
-  wobble += band * (hash(vec2(floor(uv.y * uSize.y), field)) - 0.5) * 0.007;
+  wobble += band * (hash(vec2(line, field)) - 0.5) * 0.007;
 
-  vec2 warped = vec2(clamp(uv.x + wobble + tear, 0.0, 1.0), uv.y);
+  vec2 warped = vec2(clamp(uv.x + wobble + tear + jitter, 0.0, 1.0), uv.y);
 
-  // Chroma was recorded at a fraction of luma bandwidth, so it smears sideways
-  // and the channels land in different places.
-  float bleed = 0.0013 + band * 0.002;
-  vec3 color = vec3(
-    texture(uTexture, vec2(clamp(warped.x - bleed, 0.0, 1.0), warped.y)).r,
-    texture(uTexture, warped).g,
-    texture(uTexture, vec2(clamp(warped.x + bleed, 0.0, 1.0), warped.y)).b);
+  // Bandwidth is a property of the tape, so the taps step by source pixels and
+  // the smear stays put however large the picture is drawn.
+  float texel = 1.0 / uSource.x;
+  vec3 sigma = vec3(0.7, 3.2, 6.4) * (1.0 + band * 1.5);
 
-  // Luma smear trailing right off bright edges.
-  vec3 trail = vec3(0.0);
-  for (int i = 1; i <= 4; i++) {
-    trail += texture(
-      uTexture,
-      vec2(clamp(warped.x - float(i) * 0.0032, 0.0, 1.0), warped.y)).rgb;
+  vec3 acc = vec3(0.0);
+  vec3 weight = vec3(0.0);
+  float soft = 0.0;
+  float softWeight = 0.0;
+
+  for (int i = -12; i <= 12; i++) {
+    float d = float(i);
+    vec3 s = RGB_TO_YIQ * texture(
+      uTexture, vec2(clamp(warped.x + d * texel, 0.0, 1.0), warped.y)).rgb;
+
+    // Luma keeps almost all of its detail, I loses most of it and Q nearly
+    // all — which is why reds run on tape while edges stay legible.
+    vec3 g = exp(-(d * d) / (2.0 * sigma * sigma));
+    acc += s * g;
+    weight += g;
+
+    // A second, wider luma pass: the reference the peaking circuit below
+    // works against.
+    float gs = exp(-(d * d) / (2.0 * 2.4 * 2.4));
+    soft += s.x * gs;
+    softWeight += gs;
   }
-  color = mix(color, color * 0.74 + trail * 0.065, 0.5);
+
+  vec3 yiq = acc / weight;
+
+  // Every VCR oversharpens to claw back the detail the tape lost, and overdoes
+  // it — the bright fringe beside hard edges is the give-away.
+  yiq.x += (yiq.x - soft / softWeight) * 1.15;
+
+  // The ring trails the edge rather than surrounding it: the circuit reacts to
+  // a signal it has already passed.
+  float behind = (RGB_TO_YIQ * texture(
+    uTexture,
+    vec2(clamp(warped.x - 2.5 * texel, 0.0, 1.0), warped.y)).rgb).x;
+  yiq.x -= (behind - yiq.x) * 0.12;
+
+  // Chroma noise sits far above luma noise on tape.
+  vec2 grainSeed = vec2(
+    floor(uv.x * uSource.x) + field * 37.0,
+    line + field * 91.0);
+  yiq.y += (hash(grainSeed) - 0.5) * 0.035;
+  yiq.z += (hash(grainSeed.yx) - 0.5) * 0.035;
+
+  vec3 color = clamp(YIQ_TO_RGB * yiq, 0.0, 1.0);
 
   // Dropouts: short bright streaks where the tape lost contact. A handful of
   // lines per field, each covering part of the width.
-  float line = floor(uv.y * uSize.y * 0.5);
+  float dropRow = floor(uv.y * uSource.y * 0.5);
   for (int i = 0; i < 2; i++) {
     float seed = hash1(field * 7.0 + float(i) * 131.0);
-    float dropLine = floor(seed * uSize.y * 0.5);
-    if (abs(line - dropLine) < 1.0) {
+    float dropLine = floor(seed * uSource.y * 0.5);
+    if (abs(dropRow - dropLine) < 1.0) {
       float start = hash1(seed * 13.0);
       float len = 0.03 + hash1(seed * 29.0) * 0.16;
       float inStreak = step(start, uv.x) * step(uv.x, start + len);
-      float sparkle = hash(vec2(floor(uv.x * uSize.x * 0.5), dropLine + field));
+      float sparkle = hash(vec2(floor(uv.x * uSource.x), dropLine + field));
       color = mix(color, vec3(0.9 + sparkle * 0.1), inStreak * 0.45);
     }
   }
 
   // Fine tape grain, heavier in the darks like real magnetic media.
-  float grain = hash(vec2(
-    floor(uv.x * uSize.x * 0.5) + field * 37.0,
-    floor(uv.y * uSize.y * 0.5) + field * 91.0));
-  color += (grain - 0.5) * 0.025 * (1.25 - dot(color, vec3(0.333)));
+  float grain = hash(grainSeed * 1.7);
+  color += (grain - 0.5) * 0.022 * (1.25 - dot(color, vec3(0.333)));
 
   // The switching band itself: noisy, desaturated, and brighter at the seam.
   float seam = smoothstep(0.012, 0.0, uv.y);
@@ -93,5 +143,5 @@ void main() {
   vec2 c = uv - 0.5;
   color *= 1.0 - dot(c, c) * 0.2;
 
-  fragColor = vec4(color, 1.0);
+  fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }

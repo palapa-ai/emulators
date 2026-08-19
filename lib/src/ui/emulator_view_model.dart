@@ -33,11 +33,14 @@ class EmulatorViewModel extends ChangeNotifier {
   /// One session per cartridge, so every shelf card can show a live picture.
   /// Only the focused one is audible — several soundtracks at once is noise.
   final _sessions = <String, EmulatorSession>{};
-  EmulatorSession _focused;
+  final EmulatorSession _focused;
 
   EmulatorSession get session => _focused;
 
-  EmulatorSession? sessionFor(RomFile rom) => _sessions[rom.path];
+  /// The playing cartridge answers with the focused session, so its card
+  /// shows the same picture as the screen rather than going blank.
+  EmulatorSession? sessionFor(RomFile rom) =>
+      rom.path == _focused.rom?.path ? _focused : _sessions[rom.path];
 
   bool _previewsRunning = true;
   bool get previewsRunning => _previewsRunning;
@@ -47,46 +50,67 @@ class EmulatorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Emulating a shelf nobody is looking at is pure waste, so previews are
-  /// capped and only cover what the host says is on screen.
-  static const maxPreviews = 3;
+  /// Emulating a shelf nobody is looking at is pure waste, so previews only
+  /// cover cards the host has put on screen, and never more than this many at
+  /// once — each one is a whole core with its own copy of the ROM.
+  static const maxPreviews = 8;
 
-  var _visible = <String>{};
+  final _visible = <String>{};
+  var _syncQueued = false;
 
-  Future<void> setVisible(Iterable<RomFile> roms) async {
-    final wanted = roms.take(maxPreviews).map((r) => r.path).toSet();
-    if (_setEquals(wanted, _visible)) return;
-
-    _visible = wanted;
-    if (_previewsRunning) await _startPreviews();
-    notifyListeners();
+  /// Called by a card as it scrolls into and out of the viewport. A scroll
+  /// moves many at once, so the sessions are reconciled once at the end.
+  void showPreview(RomFile rom) {
+    if (_visible.add(rom.path)) _queueSync();
   }
 
-  bool _setEquals(Set<String> a, Set<String> b) =>
-      a.length == b.length && a.every(b.contains);
+  void hidePreview(RomFile rom) {
+    if (_visible.remove(rom.path)) _queueSync();
+  }
+
+  void _queueSync() {
+    if (_syncQueued) return;
+    _syncQueued = true;
+    scheduleMicrotask(() async {
+      _syncQueued = false;
+      if (_previewsRunning) await _startPreviews();
+      notifyListeners();
+    });
+  }
 
   Future<void> _startPreviews() async {
     _previewsRunning = true;
     final core = session.corePath;
     if (core == null) return;
 
+    final keep = _roms
+        .where((r) => _visible.contains(r.path) && r.path != _focused.rom?.path)
+        .take(maxPreviews)
+        .map((r) => r.path)
+        .toSet();
+
     for (final entry in _sessions.entries.toList()) {
-      if (entry.key == _focusKey || _visible.contains(entry.key)) continue;
-      entry.value
-        ..removeListener(notifyListeners)
-        ..dispose();
+      if (entry.key == _focusKey || keep.contains(entry.key)) continue;
+      _park(entry.value, _previewSlot);
+      entry.value.dispose();
       _sessions.remove(entry.key);
     }
 
-    for (final rom in _roms.where((r) => _visible.contains(r.path))) {
+    final wanted = _roms
+        .where((r) => _visible.contains(r.path) && r.path != _focused.rom?.path)
+        .take(maxPreviews);
+
+    for (final rom in wanted) {
       if (rom.path == _focused.rom?.path || _sessions.containsKey(rom.path)) {
         continue;
       }
 
+      // No global listener: each shelf card watches its own preview, so a
+      // frame repaints one thumbnail instead of the entire shelf.
       final preview = EmulatorSession(corePath: core, preview: true)
-        ..addListener(notifyListeners)
         ..play(rom);
       _sessions[rom.path] = preview;
+      await _resume(preview, rom, _previewSlot);
     }
   }
 
@@ -94,9 +118,8 @@ class EmulatorViewModel extends ChangeNotifier {
     _previewsRunning = false;
     for (final entry in _sessions.entries.toList()) {
       if (entry.key == _focusKey) continue;
-      entry.value
-        ..removeListener(notifyListeners)
-        ..dispose();
+      _park(entry.value, _previewSlot);
+      entry.value.dispose();
       _sessions.remove(entry.key);
     }
   }
@@ -191,19 +214,16 @@ class EmulatorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void play(RomFile rom) {
-    // A preview already running this cartridge becomes the focused session
-    // rather than being torn down and started over.
-    final existing = _sessions[rom.path];
-    if (existing != null && existing != _focused) {
-      _focused.setMuted(muted: true);
-      _focused = existing;
-      existing.setMuted(muted: false);
-      notifyListeners();
-      return;
-    }
-
+  Future<void> play(RomFile rom) async {
+    // Always the dedicated session. Adopting the running preview looked like
+    // a free swap, but a preview is half resolution with no sound — promoting
+    // one put a thumbnail on the screen, and left the cartridge you stepped
+    // away from emulating at full rate for nobody.
+    _park(_focused, _resumeSlot);
     _focused.play(rom);
+    await _resume(_focused, rom, _resumeSlot);
+    if (_previewsRunning) await _startPreviews();
+    notifyListeners();
   }
   void pause() => session.pause();
   void resume() => session.resume();
@@ -213,6 +233,26 @@ class EmulatorViewModel extends ChangeNotifier {
 
   /// Three slots per cartridge, kept beside it on disk.
   static const slotCount = 3;
+
+  /// Two more the shelf never shows. A preview parks in one as it scrolls
+  /// away so it carries on instead of rebooting, and the cartridge you step
+  /// away from parks in the other so clicking it puts you back where you were.
+  static const _previewSlot = 4;
+  static const _resumeSlot = 5;
+
+  void _park(EmulatorSession session, int slot) {
+    final rom = session.rom;
+    if (rom == null || !session.isRunning) return;
+    final state = session.saveState();
+    if (state == null) return;
+    unawaited(File(_slotPath(rom, slot)).writeAsBytes(state));
+  }
+
+  Future<void> _resume(EmulatorSession session, RomFile rom, int slot) async {
+    final file = File(_slotPath(rom, slot));
+    if (!file.existsSync()) return;
+    session.loadState(await file.readAsBytes());
+  }
 
   String _slotPath(RomFile rom, int slot) => '${rom.path}.state$slot';
 
@@ -225,7 +265,7 @@ class EmulatorViewModel extends ChangeNotifier {
     if (rom == null || state == null) return;
 
     await File(_slotPath(rom, slot)).writeAsBytes(state);
-    session.log('saved slot $slot');
+    session.log('saved #$slot');
     notifyListeners();
   }
 
@@ -239,8 +279,8 @@ class EmulatorViewModel extends ChangeNotifier {
       return;
     }
 
-    if (from != null && from.path != session.rom?.path) play(from);
-    session.loadState(await file.readAsBytes());
+    if (from != null && from.path != session.rom?.path) await play(from);
+    if (session.loadState(await file.readAsBytes())) session.log('loaded #$slot');
   }
   void stop() => session.stop();
   void reset() => session.reset();

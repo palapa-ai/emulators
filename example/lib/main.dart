@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:emulators/emulators.dart';
 import 'package:flutter/services.dart';
@@ -64,7 +65,7 @@ class _WorkbenchState extends State<_Workbench> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  width: 380,
+                  width: 570,
                   child: _Library(viewModel: _viewModel, skin: skin),
                 ),
                 const SizedBox(width: 12),
@@ -73,6 +74,7 @@ class _WorkbenchState extends State<_Workbench> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
+                        flex: 7,
                         child: Center(
                           child: AspectRatio(
                             aspectRatio: 4 / 3,
@@ -98,7 +100,10 @@ class _WorkbenchState extends State<_Workbench> {
                       const SizedBox(height: 12),
                       _PadTicker(viewModel: _viewModel, skin: skin),
                       const SizedBox(height: 12),
-                      _Log(viewModel: _viewModel, skin: skin),
+                      Expanded(
+                        flex: 2,
+                        child: _Log(viewModel: _viewModel, skin: skin),
+                      ),
                     ],
                   ),
                 ),
@@ -120,10 +125,6 @@ class _Library extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roms = viewModel.roms;
-    final onScreen = roms.take(EmulatorViewModel.maxPreviews).toList();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => viewModel.setVisible(onScreen),
-    );
 
     final counts = {
       for (final system in RomSystem.values)
@@ -135,22 +136,25 @@ class _Library extends StatelessWidget {
       title: counts.entries
           .map((e) => '${e.key.label} (${e.value})')
           .join('   '),
+      // Lazy on purpose: a card only exists while it is near the viewport,
+      // which is what tells the view model to run or drop its preview.
       child: Expanded(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final rom in roms.take(EmulatorViewModel.maxPreviews + 3))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _LibraryCard(
-                    viewModel: viewModel,
-                    skin: skin,
-                    rom: rom,
-                    playing: rom == viewModel.playing,
-                  ),
-                ),
-            ],
+        child: ListView.builder(
+          padding: EdgeInsets.zero,
+          itemCount: roms.length,
+          itemBuilder: (context, i) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _PreviewScope(
+              key: ValueKey(roms[i].path),
+              viewModel: viewModel,
+              rom: roms[i],
+              child: _LibraryCard(
+                viewModel: viewModel,
+                skin: skin,
+                rom: roms[i],
+                playing: roms[i] == viewModel.playing,
+              ),
+            ),
           ),
         ),
       ),
@@ -169,6 +173,41 @@ void _debounced(VoidCallback action) {
   action();
 }
 
+/// Runs a cartridge's preview for exactly as long as its card is built, so
+/// scrolling one off the shelf unloads the emulator behind it.
+class _PreviewScope extends StatefulWidget {
+  const _PreviewScope({
+    super.key,
+    required this.viewModel,
+    required this.rom,
+    required this.child,
+  });
+
+  final EmulatorViewModel viewModel;
+  final RomFile rom;
+  final Widget child;
+
+  @override
+  State<_PreviewScope> createState() => _PreviewScopeState();
+}
+
+class _PreviewScopeState extends State<_PreviewScope> {
+  @override
+  void initState() {
+    super.initState();
+    widget.viewModel.showPreview(widget.rom);
+  }
+
+  @override
+  void dispose() {
+    widget.viewModel.hidePreview(widget.rom);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _LibraryCard extends StatelessWidget {
   const _LibraryCard({
     required this.viewModel,
@@ -184,7 +223,7 @@ class _LibraryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final frame = viewModel.sessionFor(rom)?.frame;
+    final session = viewModel.sessionFor(rom);
 
     return GestureDetector(
       onTap: () => _debounced(() => viewModel.play(rom)),
@@ -208,9 +247,22 @@ class _LibraryCard extends StatelessWidget {
                     aspectRatio: 4 / 3,
                     child: ColoredBox(
                       color: skin.screen(context),
-                      child: frame == null
+                      // Listening per card keeps one preview's frame from
+                      // rebuilding the whole window.
+                      child: session == null
                           ? const SizedBox.expand()
-                          : RawImage(image: frame, fit: BoxFit.contain),
+                          : RepaintBoundary(
+                              child: ValueListenableBuilder<ui.Image?>(
+                                valueListenable: session.frames,
+                                builder: (context, frame, _) => frame == null
+                                    ? const SizedBox.expand()
+                                    : RawImage(
+                                        image: frame,
+                                        fit: BoxFit.contain,
+                                        filterQuality: FilterQuality.none,
+                                      ),
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -220,6 +272,8 @@ class _LibraryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       skin.text(context, rom.title, maxLines: 2),
+                      const SizedBox(height: 4),
+                      _CopyPath(rom: rom, skin: skin),
                       const SizedBox(height: 4),
                       skin.text(
                         context,
@@ -262,8 +316,6 @@ class _LibraryCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            _CopyPath(rom: rom, skin: skin),
           ],
         ),
       ),
@@ -391,25 +443,34 @@ class _PadTicker extends StatelessWidget {
       trailing: [
         skin.text(
           context,
-          'mask ${viewModel.heldMask}  pad ${viewModel.padMask}  '
-'${viewModel.padName ?? 'no pad'}',
+          viewModel.padName ?? 'no pad',
           role: EmulatorTextRole.caption,
         ),
       ],
       child: SizedBox(
         height: 24,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          reverse: true,
-          itemCount: presses.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) => Center(
-            child: skin.text(
-              context,
-              presses[presses.length - 1 - i].label,
-              role: i == 0 ? EmulatorTextRole.heading : EmulatorTextRole.caption,
+        child: Row(
+          children: [
+            skin.text(context, 'Controller #1', role: EmulatorTextRole.caption),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                reverse: true,
+                itemCount: presses.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => Center(
+                  child: skin.text(
+                    context,
+                    presses[presses.length - 1 - i].label,
+                    role: i == 0
+                        ? EmulatorTextRole.heading
+                        : EmulatorTextRole.caption,
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -429,34 +490,32 @@ class _Log extends StatelessWidget {
     return skin.panel(
       context,
       title: 'Log',
-      child: SizedBox(
-        height: 50,
-        child: ListView.builder(
-          reverse: true,
-          padding: EdgeInsets.zero,
-          itemCount: lines.length,
-          itemBuilder: (_, i) {
-            final row = lines.length - 1 - i;
-            return ColoredBox(
-              color: row.isEven
-                  ? const Color(0x00000000)
-                  : const Color(0x0affffff),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                child: Text(
-                  lines[row],
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontFamily: 'Menlo',
-                    fontSize: 10,
-                    height: 1.4,
-                    color: Color(0x99e8e8ee),
-                  ),
+      fill: true,
+      child: ListView.builder(
+        reverse: true,
+        padding: EdgeInsets.zero,
+        itemCount: lines.length,
+        itemBuilder: (_, i) {
+          final row = lines.length - 1 - i;
+          return ColoredBox(
+            color: row.isEven
+                ? const Color(0x00000000)
+                : const Color(0x0affffff),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              child: Text(
+                lines[row],
+                maxLines: 1,
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 10,
+                  height: 1.4,
+                  color: Color(0x99e8e8ee),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }

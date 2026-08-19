@@ -73,6 +73,8 @@ class _VhsPainter extends CustomPainter {
       ..setFloat(0, size.width)
       ..setFloat(1, size.height)
       ..setFloat(2, seconds)
+      ..setFloat(3, frame.width.toDouble())
+      ..setFloat(4, frame.height.toDouble())
       ..setImageSampler(0, frame);
 
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);

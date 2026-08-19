@@ -132,13 +132,20 @@ class _StylePainter extends CustomPainter {
         Color.fromRGBO(0, 0, 255, alpha),
       ];
 
+      // One Paint per band, not one per rect: this runs for every column of
+      // the picture, on every frame a style is on.
+      final paints = [
+        for (final color in colors)
+          Paint()
+            ..color = color
+            ..blendMode = BlendMode.screen,
+      ];
+
       for (var x = 0.0; x < size.width; x += scaleX) {
         for (var band = 0; band < 3; band++) {
           canvas.drawRect(
             Rect.fromLTWH(x + third * band, 0, third, size.height),
-            Paint()
-              ..color = colors[band]
-              ..blendMode = BlendMode.screen,
+            paints[band],
           );
         }
       }

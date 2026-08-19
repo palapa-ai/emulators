@@ -39,8 +39,8 @@ enum DisplayStyle {
     scanlineDepth: 0.41,
     tint: Color(0xfff8ebff),
   ),
-  horizontal(
-    label: 'Horizontal',
+  homeTv(
+    label: 'Home TV',
     verticalStripe: 0.34,
     verticalStripeDepth: 0.47,
     tint: Color(0xfffffcf5),
