@@ -70,8 +70,10 @@ class EmulatorSkin {
     required String label,
     required VoidCallback onTap,
     EmulatorIcon? icon,
+    VoidCallback? onSecondaryTap,
   }) => _Hoverable(
     onTap: onTap,
+    onSecondaryTap: onSecondaryTap,
     builder: (hovered) => Container(
       padding: EdgeInsets.symmetric(
         horizontal: icon == null ? 12 : 8,
@@ -92,7 +94,6 @@ class EmulatorSkin {
             ),
     ),
   );
-
 
   /// A titled region. The default is a plain bordered box; hosts with a
   /// design system draw their own.
@@ -169,9 +170,14 @@ class EmulatorTheme extends InheritedWidget {
 }
 
 class _Hoverable extends StatefulWidget {
-  const _Hoverable({required this.onTap, required this.builder});
+  const _Hoverable({
+    required this.onTap,
+    required this.builder,
+    this.onSecondaryTap,
+  });
 
   final VoidCallback onTap;
+  final VoidCallback? onSecondaryTap;
   final Widget Function(bool hovered) builder;
 
   @override
@@ -186,6 +192,10 @@ class _HoverableState extends State<_Hoverable> {
     cursor: SystemMouseCursors.click,
     onEnter: (_) => setState(() => _hovered = true),
     onExit: (_) => setState(() => _hovered = false),
-    child: GestureDetector(onTap: widget.onTap, child: widget.builder(_hovered)),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      onSecondaryTap: widget.onSecondaryTap,
+      child: widget.builder(_hovered),
+    ),
   );
 }

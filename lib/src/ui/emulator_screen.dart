@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../controller_pairing.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import 'emulator_skin.dart';
@@ -147,32 +148,40 @@ class _Stage extends StatelessWidget {
     return Column(
       children: [
         Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: skin.screen(context),
-              border: Border.all(color: skin.line(context)),
-            ),
-            // The picture is the only thing arriving at frame rate, so it
-            // repaints on its own rather than with the rest of the screen.
-            child: RepaintBoundary(
-              child: ValueListenableBuilder<ui.Image?>(
-                valueListenable: session.frames,
-                builder: (context, frame, _) => SizedBox.expand(
-                  child: switch (frame) {
-                    null => const SizedBox.expand(),
-                    final frame when viewModel.style?.shader ?? false =>
-                      VhsView(frame: frame),
-                    final frame => StyleOverlay(
-                      style: viewModel.style,
-                      sourceWidth: frame.width,
-                      sourceHeight: frame.height,
-                      child: RawImage(
-                        image: frame,
-                        fit: .fill,
-                        filterQuality: .none,
+          child: GestureDetector(
+            onTap: viewModel.togglePause,
+            child: Container(
+              decoration: BoxDecoration(
+                color: skin.screen(context),
+                border: Border.all(color: skin.line(context)),
+              ),
+              // The picture is the only thing arriving at frame rate, so it
+              // repaints on its own rather than with the rest of the screen.
+              child: RepaintBoundary(
+                child: ValueListenableBuilder<ui.Image?>(
+                  valueListenable: session.frames,
+                  // The stage fills whatever room it is given, but the picture
+                  // keeps the shape the console drew it in.
+                  builder: (context, frame, _) => Center(
+                    child: switch (frame) {
+                      null => const SizedBox.expand(),
+                      final frame => AspectRatio(
+                        aspectRatio: frame.width / frame.height,
+                        child: viewModel.style?.shader ?? false
+                            ? VhsView(frame: frame)
+                            : StyleOverlay(
+                                style: viewModel.style,
+                                sourceWidth: frame.width,
+                                sourceHeight: frame.height,
+                                child: RawImage(
+                                  image: frame,
+                                  fit: .fill,
+                                  filterQuality: .none,
+                                ),
+                              ),
                       ),
-                    ),
-                  },
+                    },
+                  ),
                 ),
               ),
             ),
@@ -183,19 +192,25 @@ class _Stage extends StatelessWidget {
           children: [
             if (transportLeading != null) transportLeading ?? const SizedBox(),
             const Spacer(),
-            if (onPairController != null)
+            // With no pad attached the package can still get the user to the
+            // system's pairing pane, so the affordance does not wait on a host.
+            if (onPairController != null ||
+                (viewModel.gamepadName == null &&
+                    ControllerPairing.canOpen)) ...[
               skin.button(
                 context,
-                label: viewModel.gamepadName ?? 'Pair controller',
+                label: viewModel.gamepadName ?? 'Connect controller',
                 icon: .controller,
-                onTap: onPairController ?? () {},
+                onTap: onPairController ?? ControllerPairing.open,
               ),
-            if (onPairController != null) const SizedBox(width: 8),
+              const SizedBox(width: 8),
+            ],
             skin.button(
               context,
               label: viewModel.style?.label ?? 'Raw',
               icon: .display,
               onTap: viewModel.cycleStyle,
+              onSecondaryTap: () => viewModel.cycleStyle(reverse: true),
             ),
             const SizedBox(width: 8),
             skin.button(
@@ -210,6 +225,7 @@ class _Stage extends StatelessWidget {
               label: viewModel.speed.label,
               icon: .speed,
               onTap: viewModel.cycleSpeed,
+              onSecondaryTap: () => viewModel.cycleSpeed(reverse: true),
             ),
             const SizedBox(width: 8),
             skin.button(
@@ -270,11 +286,7 @@ class _Shelf extends StatelessWidget {
         height: 104,
         child: roms.isEmpty
             ? Center(
-                child: skin.text(
-                  context,
-                  'No cartridges yet',
-                  role: .caption,
-                ),
+                child: skin.text(context, 'No cartridges yet', role: .caption),
               )
             : ListView.separated(
                 scrollDirection: .horizontal,

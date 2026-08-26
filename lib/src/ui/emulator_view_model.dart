@@ -107,10 +107,15 @@ class EmulatorViewModel extends ChangeNotifier {
 
       // No global listener: each shelf card watches its own preview, so a
       // frame repaints one thumbnail instead of the entire shelf.
-      final preview = EmulatorSession(corePath: core, preview: true)
-        ..play(rom);
+      final preview = EmulatorSession(corePath: core, preview: true)..play(rom);
       _sessions[rom.path] = preview;
-      await _resume(preview, rom, _previewSlot);
+
+      // A cartridge the player has been inside comes back to where they left
+      // it and stops there. Only the ones never played keep running, so the
+      // shelf demonstrates what is unopened instead of restarting your game.
+      final played = hasState(rom, _resumeSlot);
+      await _resume(preview, rom, played ? _resumeSlot : _previewSlot);
+      if (played) preview.pauseOnNextFrame();
     }
   }
 
@@ -132,7 +137,6 @@ class EmulatorViewModel extends ChangeNotifier {
   RomLibrary _library;
   final CoreLibrary _cores;
 
-
   List<RomFile> _roms = const [];
   List<RomFile> get roms => _roms;
 
@@ -146,18 +150,23 @@ class EmulatorViewModel extends ChangeNotifier {
   DisplayStyle? _style = DisplayStyle.vhs;
   DisplayStyle? get style => _style;
 
-  void cycleStyle() {
+  void cycleStyle({bool reverse = false}) {
     final current = _style;
-    _style = current == null
-        ? DisplayStyle.values.first
-        : (current.index == DisplayStyle.values.length - 1
-              ? null
-              : DisplayStyle.values[current.index + 1]);
+    final last = DisplayStyle.values.length - 1;
+    _style = switch ((current, reverse)) {
+      (null, false) => DisplayStyle.values.first,
+      (null, true) => DisplayStyle.values.last,
+      (final style?, false) when style.index == last => null,
+      (final style?, true) when style.index == 0 => null,
+      (final style?, false) => DisplayStyle.values[style.index + 1],
+      (final style?, true) => DisplayStyle.values[style.index - 1],
+    };
     final audio = _style?.audio ?? StyleAudio.clean;
     session.setAudioQuality(bits: audio.bits, mono: audio.mono);
     session.log('display ${_style?.label ?? 'raw'}');
     notifyListeners();
   }
+
   List<EmulatorButton> get buttonLog => session.buttonLog;
   List<PadElement> get padLog => session.padLog;
   int get heldMask => session.heldMask;
@@ -225,11 +234,13 @@ class EmulatorViewModel extends ChangeNotifier {
     if (_previewsRunning) await _startPreviews();
     notifyListeners();
   }
+
   void pause() => session.pause();
   void resume() => session.resume();
   void togglePause() => session.isPaused ? session.resume() : session.pause();
   void toggleMuted() => session.toggleMuted();
-  void cycleSpeed() => session.cycleSpeed();
+  void cycleSpeed({bool reverse = false}) =>
+      session.cycleSpeed(reverse: reverse);
 
   /// Three slots per cartridge, kept beside it on disk.
   static const slotCount = 3;
@@ -280,8 +291,10 @@ class EmulatorViewModel extends ChangeNotifier {
     }
 
     if (from != null && from.path != session.rom?.path) await play(from);
-    if (session.loadState(await file.readAsBytes())) session.log('loaded #$slot');
+    if (session.loadState(await file.readAsBytes()))
+      session.log('loaded #$slot');
   }
+
   void stop() => session.stop();
   void reset() => session.reset();
 

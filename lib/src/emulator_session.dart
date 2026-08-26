@@ -14,7 +14,8 @@ import 'rom_file.dart';
 enum SessionStatus { idle, running, unavailable, failed }
 
 enum EmulatorSpeed {
-  half(0.5, '1/2'),
+  quarter(0.25, '0.25x'),
+  half(0.5, '0.5x'),
   normal(1, '1x'),
   fast(2, '2x'),
   turbo(4, '4x');
@@ -94,14 +95,18 @@ class EmulatorSession extends ChangeNotifier {
   /// Six frames of sound in hand. Three left no slack — a single slow frame
   /// decode starved the device and the sound dropped out.
   int get _targetBacklogFrames =>
-      ((_emulator?.sampleRate ?? 32040) / (_emulator?.framesPerSecond ?? 60) * 6)
+      ((_emulator?.sampleRate ?? 32040) /
+              (_emulator?.framesPerSecond ?? 60) *
+              6)
           .round();
 
   SessionStatus _status = SessionStatus.idle;
   bool _paused = false;
+  bool _pauseOnFrame = false;
   EmulatorSpeed _speed = EmulatorSpeed.normal;
   final _clock = Stopwatch();
   RomFile? _rom;
+
   /// Frames are published apart from the rest of the state: a new picture
   /// arrives 60 times a second, and everything watching this session for a
   /// status change has no business rebuilding at that rate.
@@ -121,9 +126,10 @@ class EmulatorSession extends ChangeNotifier {
   /// Off 1x wall time takes over as the clock, since the audio device drains
   /// at one rate only. The sound is kept on at every speed regardless, so it
   /// plays back at the pitch the core hands over.
-  void cycleSpeed() {
-    final next =
-        EmulatorSpeed.values[(_speed.index + 1) % EmulatorSpeed.values.length];
+  void cycleSpeed({bool reverse = false}) {
+    final count = EmulatorSpeed.values.length;
+    final next = EmulatorSpeed
+        .values[(_speed.index + (reverse ? -1 : 1) + count) % count];
     _speed = next;
     _emulator?.setAudioDiscard(discard: false);
     _emulator?.setAudioMuted(muted: false);
@@ -133,6 +139,7 @@ class EmulatorSession extends ChangeNotifier {
     log('${next.label} speed');
     notifyListeners();
   }
+
   double get aspectRatio => _emulator?.aspectRatio ?? 4 / 3;
   String get coreName => _emulator?.coreName ?? '';
 
@@ -224,6 +231,13 @@ class EmulatorSession extends ChangeNotifier {
     frames.value = null;
     if (_status == SessionStatus.running) _status = SessionStatus.idle;
     notifyListeners();
+  }
+
+  /// Stopping the moment a state is loaded leaves a black card — the core has
+  /// not drawn anything yet — so the picture the player left is put up first.
+  void pauseOnNextFrame() {
+    if (_emulator == null || _paused) return;
+    _pauseOnFrame = true;
   }
 
   void pause() {
@@ -377,6 +391,11 @@ class EmulatorSession extends ChangeNotifier {
       _stale = frames.value;
       frames.value = await completer.future;
       stale?.dispose();
+
+      if (_pauseOnFrame) {
+        _pauseOnFrame = false;
+        pause();
+      }
     } finally {
       _decoding = false;
     }
