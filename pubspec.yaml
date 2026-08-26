@@ -21,6 +21,7 @@ dev_dependencies:
 flutter:
   shaders:
     - shaders/vhs.frag
+    - shaders/crt.frag
 
   plugin:
     platforms:

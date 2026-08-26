@@ -106,6 +106,7 @@ enum DisplayStyle {
   /// Painted by the fragment shader instead of the geometric overlay — some
   /// looks are wobble and bleed, which no amount of rectangles will fake.
   final bool shader;
+
   /// A look that isn't only a look — the handheld sounded like its hardware.
   final StyleAudio audio;
 
@@ -113,6 +114,14 @@ enum DisplayStyle {
   /// Zero leaves it alone.
   final int nativeWidth;
   final int nativeHeight;
+
+  /// Which extra pass the style shader runs: composite video for the looks
+  /// born of one wire, the DMG panel for the handheld.
+  double get shaderMode => switch (this) {
+    nes || composite => 1,
+    gameBoy => 2,
+    _ => 0,
+  };
 
   DisplayStyle get next => values[(index + 1) % values.length];
 
