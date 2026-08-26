@@ -3,6 +3,7 @@
 build/
 pubspec.lock
 tool/harness/harness
+tool/.cores/
 *.dylib
 .build/
 .swiftpm/

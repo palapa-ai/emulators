@@ -44,8 +44,33 @@ class _WorkbenchState extends State<_Workbench> {
     autoPlay: true,
   );
 
+  static const _drop = MethodChannel('emulators_example/drop');
+
+  bool _over = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _drop.setMethodCallHandler(_onDrop);
+    _drop.invokeMethod('accept', [
+      for (final system in RomSystem.values)
+        for (final extension in system.extensions) extension.substring(1),
+    ]);
+  }
+
+  Future<void> _onDrop(MethodCall call) async {
+    switch (call.method) {
+      case 'over':
+        setState(() => _over = call.arguments as bool);
+      case 'dropped':
+        setState(() => _over = false);
+        await _viewModel.addFiles((call.arguments as List).cast<String>());
+    }
+  }
+
   @override
   void dispose() {
+    _drop.setMethodCallHandler(null);
     _viewModel.dispose();
     super.dispose();
   }
@@ -56,58 +81,61 @@ class _WorkbenchState extends State<_Workbench> {
 
     return ColoredBox(
       color: skin.background(context),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: ListenableBuilder(
-            listenable: _viewModel,
-            builder: (context, _) => Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 570,
-                  child: _Library(viewModel: _viewModel, skin: skin),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        flex: 7,
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: 4 / 3,
-                            child: EmulatorScreen(
-                          viewModel: _viewModel,
-                          showShelf: false,
-                          transportLeading: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _Slots(viewModel: _viewModel, skin: skin),
-                              const SizedBox(width: 16),
-                              _Slots(
-                                viewModel: _viewModel,
-                                skin: skin,
-                                saving: false,
-                              ),
-                            ],
-                          ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: _over ? skin.accent(context) : const Color(0x00000000),
+            width: 2,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: ListenableBuilder(
+              listenable: _viewModel,
+              builder: (context, _) => Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: 570,
+                    child: _Library(viewModel: _viewModel, skin: skin),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 7,
+                          child: EmulatorScreen(
+                            viewModel: _viewModel,
+                            showShelf: false,
+                            transportLeading: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _Slots(viewModel: _viewModel, skin: skin),
+                                const SizedBox(width: 16),
+                                _Slots(
+                                  viewModel: _viewModel,
+                                  skin: skin,
+                                  saving: false,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      _PadTicker(viewModel: _viewModel, skin: skin),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        flex: 2,
-                        child: _Log(viewModel: _viewModel, skin: skin),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        _PadTicker(viewModel: _viewModel, skin: skin),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          flex: 2,
+                          child: _Log(viewModel: _viewModel, skin: skin),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -289,29 +317,29 @@ class _LibraryCard extends StatelessWidget {
                           maxLines: 3,
                         ),
                       ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _Slots(
+                              viewModel: viewModel,
+                              skin: skin,
+                              rom: rom,
+                              saving: false,
+                              showLabel: false,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => viewModel.remove(rom),
+                            child: const EmulatorGlyph(
+                              EmulatorIcon.delete,
+                              size: 16,
+                              color: Color(0xffe05a5a),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _Slots(
-                    viewModel: viewModel,
-                    skin: skin,
-                    rom: rom,
-                    saving: false,
-                    showLabel: false,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => viewModel.remove(rom),
-                  child: const EmulatorGlyph(
-                    EmulatorIcon.delete,
-                    size: 16,
-                    color: Color(0xffe05a5a),
                   ),
                 ),
               ],
@@ -408,9 +436,7 @@ class _CopyPathState extends State<_CopyPath> {
           EmulatorGlyph(
             _copied ? EmulatorIcon.check : EmulatorIcon.copy,
             size: 13,
-            color: _copied
-                ? const Color(0xff7fd4a8)
-                : const Color(0x8ce8e8ee),
+            color: _copied ? const Color(0xff7fd4a8) : const Color(0x8ce8e8ee),
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -441,11 +467,20 @@ class _PadTicker extends StatelessWidget {
       context,
       title: 'Button Log',
       trailing: [
-        skin.text(
-          context,
-          viewModel.padName ?? 'no pad',
-          role: EmulatorTextRole.caption,
-        ),
+        if (viewModel.padName case final pad?)
+          skin.text(context, pad, role: EmulatorTextRole.caption)
+        else
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: ControllerPairing.open,
+              child: skin.text(
+                context,
+                'Connect controller',
+                role: EmulatorTextRole.caption,
+              ),
+            ),
+          ),
       ],
       child: SizedBox(
         height: 24,

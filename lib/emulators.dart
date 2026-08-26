@@ -1,3 +1,4 @@
+export 'src/controller_pairing.dart';
 export 'src/core_library.dart';
 export 'src/display_style.dart';
 export 'src/emulator.dart' show Emulator, EmulatorException;
