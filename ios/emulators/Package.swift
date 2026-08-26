@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "emulators",
-  platforms: [.iOS("13.0")],
+  platforms: [.iOS("18.0")],
   products: [
     .library(name: "emulators", targets: ["emulators", "emulators_host"])
   ],

@@ -10,6 +10,6 @@ Pod::Spec.new do |s|
   s.source_files     = 'emulators/Sources/**/*.{c,h,swift}'
   s.public_header_files = 'emulators/Sources/emulators_host/include/*.h'
   s.dependency         'Flutter'
-  s.platform         = :ios, '13.0'
+  s.platform         = :ios, '18.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
 end
