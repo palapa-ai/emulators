@@ -62,8 +62,10 @@ class _AssistantPanelState extends State<AssistantPanel> {
         if (_busy)
           skin.text(context, 'thinking…', role: EmulatorTextRole.caption),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      // The panel is short and the form is not — it scrolls rather than
+      // overflows, and the scroll is what tucks the title away.
+      child: ListView(
+        padding: EdgeInsets.zero,
         children: [
           Row(
             children: [
@@ -102,16 +104,10 @@ class _AssistantPanelState extends State<AssistantPanel> {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: SingleChildScrollView(
-              child: skin.text(
-                context,
-                _answer,
-                role: EmulatorTextRole.caption,
-              ),
-            ),
-          ),
+          if (_answer.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            skin.text(context, _answer, role: EmulatorTextRole.caption),
+          ],
         ],
       ),
     );
