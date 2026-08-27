@@ -16,6 +16,7 @@ ICONS = {
     "delete": 0xF4C4,
     "save": 0xF8DD,
     "load": 0xF38A,
+    "share": 0xF4CA,
 }
 
 font = TTFont(sys.argv[1])

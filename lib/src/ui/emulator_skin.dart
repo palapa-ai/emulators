@@ -23,6 +23,7 @@ enum EmulatorIcon {
   muted,
   save,
   load,
+  share,
   copy,
   check,
   fullscreen,
@@ -103,14 +104,22 @@ class EmulatorSkin {
         border: Border.all(color: hovered ? accent(context) : line(context)),
         borderRadius: BorderRadius.circular(5),
       ),
-      child: icon == null
-          ? text(context, label, role: EmulatorTextRole.caption)
-          : EmulatorGlyph(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            EmulatorGlyph(
               icon,
               color: hovered
                   ? accent(context)
                   : textStyle(context, EmulatorTextRole.caption).color,
             ),
+            if (label.isNotEmpty) const SizedBox(width: 6),
+          ],
+          if (label.isNotEmpty)
+            text(context, label, role: EmulatorTextRole.caption),
+        ],
+      ),
     ),
   );
 
