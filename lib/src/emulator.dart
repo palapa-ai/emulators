@@ -152,6 +152,16 @@ class Emulator {
     return Uint8List.fromList(data.cast<Uint8>().asTypedList(size));
   }
 
+  /// The console's work RAM as a live view onto core memory — reread it and
+  /// it has moved on. Null when the core does not expose it.
+  Uint8List? get systemRam {
+    final size = _bindings.ramSize(_session);
+    final data = _bindings.ramData(_session);
+
+    if (size == 0 || data == nullptr) return null;
+    return data.cast<Uint8>().asTypedList(size);
+  }
+
   void writeSaveRam(Uint8List bytes) {
     final size = _bindings.sramSize(_session);
     final data = _bindings.sramData(_session);

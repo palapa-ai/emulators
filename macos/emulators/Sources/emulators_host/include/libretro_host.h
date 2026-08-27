@@ -83,6 +83,11 @@ EMU_API int emu_state_load(EmuSession *s, const void *buf, size_t len);
 EMU_API size_t emu_sram_size(EmuSession *s);
 EMU_API void *emu_sram_data(EmuSession *s);
 
+/* The console's work RAM, live — what a debugger's memory view watches.
+   NULL/0 when the core does not expose it. */
+EMU_API size_t emu_ram_size(EmuSession *s);
+EMU_API void *emu_ram_data(EmuSession *s);
+
 #if defined(__cplusplus)
 }
 #endif

@@ -117,6 +117,12 @@ class LibretroBindings {
       sramData = lib.lookupFunction<_SramDataNative, EmuSramData>(
         'emu_sram_data',
       ),
+      ramSize = lib.lookupFunction<_SizeSessionNative, EmuSizeSession>(
+        'emu_ram_size',
+      ),
+      ramData = lib.lookupFunction<_SramDataNative, EmuSramData>(
+        'emu_ram_data',
+      ),
       audioStart = lib.lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
         'emu_audio_start',
       ),
@@ -130,10 +136,9 @@ class LibretroBindings {
       audioSetMuted = lib.lookupFunction<_SetMutedNative, EmuSetMuted>(
         'emu_audio_set_muted',
       ),
-      audioMuted = lib
-          .lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
-            'emu_audio_muted',
-          ),
+      audioMuted = lib.lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
+        'emu_audio_muted',
+      ),
       audioSetQuality = lib.lookupFunction<_SetQualityNative, EmuSetQuality>(
         'emu_audio_set_quality',
       ),
@@ -146,9 +151,9 @@ class LibretroBindings {
   factory LibretroBindings.open() => LibretroBindings._(
     Platform.isMacOS || Platform.isIOS
         ? DynamicLibrary.process()
-        : DynamicLibrary.open(Platform.isWindows
-              ? 'emulators.dll'
-              : 'libemulators.so'),
+        : DynamicLibrary.open(
+            Platform.isWindows ? 'emulators.dll' : 'libemulators.so',
+          ),
   );
 
   final EmuOpen open;
@@ -170,6 +175,8 @@ class LibretroBindings {
   final EmuStateIo stateLoad;
   final EmuSizeSession sramSize;
   final EmuSramData sramData;
+  final EmuSizeSession ramSize;
+  final EmuSramData ramData;
   final EmuIntFromSession audioStart;
   final EmuVoidSession audioStop;
   final EmuIntFromSession audioQueued;

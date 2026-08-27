@@ -661,3 +661,15 @@ void *emu_sram_data(EmuSession *s)
    return s && s->get_memory_data
          ? s->get_memory_data(RETRO_MEMORY_SAVE_RAM) : NULL;
 }
+
+size_t emu_ram_size(EmuSession *s)
+{
+   return s && s->get_memory_size
+         ? s->get_memory_size(RETRO_MEMORY_SYSTEM_RAM) : 0;
+}
+
+void *emu_ram_data(EmuSession *s)
+{
+   return s && s->get_memory_data
+         ? s->get_memory_data(RETRO_MEMORY_SYSTEM_RAM) : NULL;
+}
