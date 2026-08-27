@@ -6,10 +6,10 @@ import 'package:flutter/widgets.dart';
 import '../controller_pairing.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
+import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
-import 'style_overlay.dart';
-import 'vhs_view.dart';
+import 'style_shader_view.dart';
 
 final _keyBindings = <LogicalKeyboardKey, EmulatorButton>{
   .arrowUp: .up,
@@ -41,12 +41,17 @@ class EmulatorScreen extends StatefulWidget {
     this.onPairController,
     this.showShelf = true,
     this.transportLeading,
+    this.transportTrailing,
     super.key,
   });
 
   /// Sits at the left of the transport row — for controls only the host can
   /// provide, like save slots that need somewhere to write.
   final Widget? transportLeading;
+
+  /// Joins the right-hand cluster of transport buttons — for host controls
+  /// that belong with them, like a fullscreen toggle.
+  final Widget? transportTrailing;
 
   /// Hosts that give the collection its own place on screen turn this off.
   final bool showShelf;
@@ -111,6 +116,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
                   skin: skin,
                   onPairController: widget.onPairController,
                   transportLeading: widget.transportLeading,
+                  transportTrailing: widget.transportTrailing,
                 ),
               ),
               if (widget.showShelf) ...[
@@ -131,12 +137,14 @@ class _Stage extends StatelessWidget {
     required this.skin,
     this.onPairController,
     this.transportLeading,
+    this.transportTrailing,
   });
 
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
   final VoidCallback? onPairController;
   final Widget? transportLeading;
+  final Widget? transportTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -163,22 +171,19 @@ class _Stage extends StatelessWidget {
                   // The stage fills whatever room it is given, but the picture
                   // keeps the shape the console drew it in.
                   builder: (context, frame, _) => Center(
-                    child: switch (frame) {
-                      null => const SizedBox.expand(),
-                      final frame => AspectRatio(
+                    child: switch ((frame, viewModel.style)) {
+                      (null, _) => const SizedBox.expand(),
+                      (final frame?, final style?) => AspectRatio(
                         aspectRatio: frame.width / frame.height,
-                        child: viewModel.style?.shader ?? false
-                            ? VhsView(frame: frame)
-                            : StyleOverlay(
-                                style: viewModel.style,
-                                sourceWidth: frame.width,
-                                sourceHeight: frame.height,
-                                child: RawImage(
-                                  image: frame,
-                                  fit: .fill,
-                                  filterQuality: .none,
-                                ),
-                              ),
+                        child: StyleShaderView(frame: frame, style: style),
+                      ),
+                      (final frame?, null) => AspectRatio(
+                        aspectRatio: frame.width / frame.height,
+                        child: RawImage(
+                          image: frame,
+                          fit: .fill,
+                          filterQuality: .none,
+                        ),
                       ),
                     },
                   ),
@@ -208,7 +213,7 @@ class _Stage extends StatelessWidget {
             skin.button(
               context,
               label: viewModel.style?.label ?? 'Raw',
-              icon: .display,
+              icon: viewModel.style.icon,
               onTap: viewModel.cycleStyle,
               onSecondaryTap: () => viewModel.cycleStyle(reverse: true),
             ),
@@ -223,7 +228,7 @@ class _Stage extends StatelessWidget {
             skin.button(
               context,
               label: viewModel.speed.label,
-              icon: .speed,
+              icon: viewModel.speed.icon,
               onTap: viewModel.cycleSpeed,
               onSecondaryTap: () => viewModel.cycleSpeed(reverse: true),
             ),
@@ -241,6 +246,10 @@ class _Stage extends StatelessWidget {
               icon: viewModel.isPaused ? .play : .pause,
               onTap: viewModel.togglePause,
             ),
+            if (transportTrailing != null) ...[
+              const SizedBox(width: 8),
+              transportTrailing ?? const SizedBox(),
+            ],
           ],
         ),
       ],

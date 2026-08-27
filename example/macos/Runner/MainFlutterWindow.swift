@@ -23,13 +23,20 @@ class MainFlutterWindow: NSWindow {
     // Which extensions count as a cartridge is Dart's to decide; drag feedback
     // has to answer synchronously, so the list is pushed up front.
     channel.setMethodCallHandler { [weak self] call, result in
-      guard call.method == "accept", let extensions = call.arguments as? [String]
-      else {
+      switch call.method {
+      case "accept":
+        guard let extensions = call.arguments as? [String] else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        self?.romExtensions = Set(extensions.map { $0.lowercased() })
+        result(nil)
+      case "fullscreen":
+        self?.toggleFullScreen(nil)
+        result(nil)
+      default:
         result(FlutterMethodNotImplemented)
-        return
       }
-      self?.romExtensions = Set(extensions.map { $0.lowercased() })
-      result(nil)
     }
     drop = channel
 

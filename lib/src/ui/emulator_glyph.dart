@@ -1,8 +1,34 @@
-import 'dart:math' as math;
-
 import 'package:flutter/widgets.dart';
 
+import '../display_style.dart';
+import '../emulator_session.dart';
 import 'emulator_skin.dart';
+
+part 'cupertino_paths.dart';
+
+extension DisplayStyleIcon on DisplayStyle? {
+  EmulatorIcon get icon => switch (this) {
+    null => EmulatorIcon.styleRaw,
+    DisplayStyle.vhs => EmulatorIcon.styleVhs,
+    DisplayStyle.trinitron => EmulatorIcon.styleTrinitron,
+    DisplayStyle.arcade => EmulatorIcon.styleArcade,
+    DisplayStyle.homeTv => EmulatorIcon.styleHomeTv,
+    DisplayStyle.dotMatrix => EmulatorIcon.styleDotMatrix,
+    DisplayStyle.nes => EmulatorIcon.styleNes,
+    DisplayStyle.gameBoy => EmulatorIcon.styleGameBoy,
+    DisplayStyle.composite => EmulatorIcon.styleComposite,
+  };
+}
+
+extension EmulatorSpeedIcon on EmulatorSpeed {
+  EmulatorIcon get icon => switch (this) {
+    EmulatorSpeed.quarter => EmulatorIcon.speedQuarter,
+    EmulatorSpeed.half => EmulatorIcon.speedHalf,
+    EmulatorSpeed.normal => EmulatorIcon.speedNormal,
+    EmulatorSpeed.fast => EmulatorIcon.speedDouble,
+    EmulatorSpeed.turbo => EmulatorIcon.speedQuad,
+  };
+}
 
 /// Drawn rather than set in a font: an icon font would be a dependency, and
 /// these are simple enough to be paths.
@@ -16,10 +42,7 @@ class EmulatorGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: Size.square(size),
-    painter: _GlyphPainter(
-      icon: icon,
-      color: color ?? const Color(0xffe8e8ee),
-    ),
+    painter: _GlyphPainter(icon: icon, color: color ?? const Color(0xffe8e8ee)),
   );
 }
 
@@ -45,35 +68,30 @@ class _GlyphPainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.fill;
 
+    // The standard chrome draws with vendored Cupertino outlines; only the
+    // icons with no Cupertino equivalent are drawn by hand below.
+    final cupertino = _cupertinoPaths[icon];
+    if (cupertino != null) {
+      canvas.drawPath(cupertino, fill);
+      canvas.restore();
+      return;
+    }
+
     switch (icon) {
+      // Covered by the vendored Cupertino outlines above.
       case EmulatorIcon.play:
-        canvas.drawPath(
-          Path()
-            ..moveTo(4.5, 3)
-            ..lineTo(13, 8)
-            ..lineTo(4.5, 13)
-            ..close(),
-          fill,
-        );
       case EmulatorIcon.pause:
-        canvas.drawRRect(_bar(5, 3, 2, 10), fill);
-        canvas.drawRRect(_bar(9, 3, 2, 10), fill);
       case EmulatorIcon.reset:
-        canvas.drawArc(
-          const Rect.fromLTWH(3.2, 3.2, 9.6, 9.6),
-          -math.pi / 2,
-          math.pi * 1.55,
-          false,
-          stroke,
-        );
-        canvas.drawPath(
-          Path()
-            ..moveTo(8, 1)
-            ..lineTo(8, 5)
-            ..lineTo(4.6, 3)
-            ..close(),
-          fill,
-        );
+      case EmulatorIcon.controller:
+      case EmulatorIcon.sound:
+      case EmulatorIcon.muted:
+      case EmulatorIcon.save:
+      case EmulatorIcon.load:
+      case EmulatorIcon.delete:
+      case EmulatorIcon.copy:
+      case EmulatorIcon.check:
+      case EmulatorIcon.fullscreen:
+        break;
       case EmulatorIcon.eject:
         canvas.drawPath(
           Path()
@@ -84,144 +102,82 @@ class _GlyphPainter extends CustomPainter {
           fill,
         );
         canvas.drawRRect(_bar(2.5, 11.5, 11, 1.8), fill);
-      case EmulatorIcon.controller:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(1.5, 4.5, 13, 7),
-            const Radius.circular(3),
-          ),
-          stroke,
-        );
-        canvas.drawLine(const Offset(4, 8), const Offset(6.4, 8), stroke);
-        canvas.drawLine(const Offset(5.2, 6.8), const Offset(5.2, 9.2), stroke);
-        canvas.drawCircle(const Offset(11, 7), 0.9, fill);
-        canvas.drawCircle(const Offset(11, 9.4), 0.9, fill);
-      case EmulatorIcon.display:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(1.8, 3, 12.4, 8.5),
-            const Radius.circular(1.6),
-          ),
-          stroke,
-        );
-        canvas.drawLine(const Offset(5.5, 14), const Offset(10.5, 14), stroke);
-      case EmulatorIcon.sound:
-      case EmulatorIcon.muted:
-        canvas.drawPath(
-          Path()
-            ..moveTo(3, 6)
-            ..lineTo(5.5, 6)
-            ..lineTo(8.5, 3)
-            ..lineTo(8.5, 13)
-            ..lineTo(5.5, 10)
-            ..lineTo(3, 10)
-            ..close(),
-          fill,
-        );
-        if (icon == EmulatorIcon.sound) {
-          canvas.drawArc(
-            const Rect.fromLTWH(8, 4.5, 4, 7),
-            -math.pi / 3,
-            math.pi * 2 / 3,
-            false,
-            stroke,
-          );
-          canvas.drawArc(
-            const Rect.fromLTWH(8.5, 2.5, 6.5, 11),
-            -math.pi / 3,
-            math.pi * 2 / 3,
-            false,
-            stroke,
-          );
-        } else {
-          canvas.drawLine(const Offset(11, 6), const Offset(14, 10), stroke);
-          canvas.drawLine(const Offset(14, 6), const Offset(11, 10), stroke);
+      case EmulatorIcon.styleRaw:
+        canvas.drawRRect(_bar(2.5, 4, 11, 8.5), stroke);
+      case EmulatorIcon.styleVhs:
+        canvas.drawRRect(_bar(2, 4.5, 12, 7.5), stroke);
+        canvas.drawCircle(const Offset(5.5, 8.2), 1.5, stroke);
+        canvas.drawCircle(const Offset(10.5, 8.2), 1.5, stroke);
+      case EmulatorIcon.styleTrinitron:
+        canvas.drawRRect(_bar(2.5, 4, 11, 8.5), stroke);
+        for (final x in [6.0, 8.0, 10.0]) {
+          canvas.drawLine(Offset(x, 5.8), Offset(x, 10.7), stroke);
         }
-      case EmulatorIcon.save:
-      case EmulatorIcon.load:
-        final down = icon == EmulatorIcon.save;
+      case EmulatorIcon.styleArcade:
+        canvas.drawLine(const Offset(4, 13), const Offset(12, 13), stroke);
+        canvas.drawLine(const Offset(8, 13), const Offset(8, 7.5), stroke);
+        canvas.drawCircle(const Offset(8, 5), 2.2, fill);
+      case EmulatorIcon.styleHomeTv:
+        canvas.drawRRect(_bar(2.5, 6, 11, 7), stroke);
+        canvas.drawLine(const Offset(8, 6), const Offset(5, 2.5), stroke);
+        canvas.drawLine(const Offset(8, 6), const Offset(11, 2.5), stroke);
+      case EmulatorIcon.styleDotMatrix:
+        for (var y = 0; y < 3; y++) {
+          for (var x = 0; x < 3; x++) {
+            canvas.drawCircle(Offset(4.5 + x * 3.5, 4.5 + y * 3.5), 1, fill);
+          }
+        }
+      case EmulatorIcon.styleNes:
+        canvas.drawRRect(_bar(2, 5, 12, 6.5), stroke);
+        canvas.drawLine(const Offset(5, 6.7), const Offset(5, 9.8), stroke);
+        canvas.drawLine(const Offset(3.5, 8.2), const Offset(6.5, 8.2), stroke);
+        canvas.drawCircle(const Offset(10, 8.2), 0.9, fill);
+        canvas.drawCircle(const Offset(12.2, 8.2), 0.9, fill);
+      case EmulatorIcon.styleGameBoy:
+        canvas.drawRRect(_bar(4.5, 2, 7, 12), stroke);
+        canvas.drawRRect(_bar(6, 3.5, 4, 4), stroke);
+        canvas.drawCircle(const Offset(9.5, 10.5), 0.9, fill);
+        canvas.drawCircle(const Offset(6.5, 11.5), 0.7, fill);
+      case EmulatorIcon.styleComposite:
+        for (final (x, y) in [(4.0, 8.0), (8.0, 8.0), (12.0, 8.0)]) {
+          canvas.drawCircle(Offset(x, y), 1.7, stroke);
+          canvas.drawCircle(Offset(x, y), 0.5, fill);
+        }
+      case EmulatorIcon.speedQuarter:
+        _chevron(canvas, stroke, 9.5, left: true);
+        _chevron(canvas, stroke, 5.5, left: true);
+      case EmulatorIcon.speedHalf:
+        _chevron(canvas, stroke, 7.5, left: true);
+      case EmulatorIcon.speedNormal:
         canvas.drawPath(
           Path()
-            ..moveTo(2.5, 9.5)
-            ..lineTo(2.5, 13)
-            ..lineTo(13.5, 13)
-            ..lineTo(13.5, 9.5),
+            ..moveTo(5.5, 4)
+            ..lineTo(11.5, 8)
+            ..lineTo(5.5, 12)
+            ..close(),
           stroke,
         );
-        canvas.drawLine(
-          Offset(8, down ? 2.5 : 9.5),
-          Offset(8, down ? 9.5 : 2.5),
-          stroke,
-        );
-        canvas.drawPath(
-          down
-              ? (Path()
-                  ..moveTo(5.4, 7)
-                  ..lineTo(8, 9.8)
-                  ..lineTo(10.6, 7))
-              : (Path()
-                  ..moveTo(5.4, 5.2)
-                  ..lineTo(8, 2.4)
-                  ..lineTo(10.6, 5.2)),
-          stroke,
-        );
-      case EmulatorIcon.speed:
-        canvas.drawArc(
-          const Rect.fromLTWH(2, 3.5, 12, 12),
-          math.pi,
-          math.pi,
-          false,
-          stroke,
-        );
-        canvas.drawLine(const Offset(8, 9.5), const Offset(11, 6), stroke);
-      case EmulatorIcon.delete:
-        canvas.drawLine(const Offset(2.5, 4), const Offset(13.5, 4), stroke);
-        canvas.drawPath(
-          Path()
-            ..moveTo(6, 4)
-            ..lineTo(6.6, 2.2)
-            ..lineTo(9.4, 2.2)
-            ..lineTo(10, 4),
-          stroke,
-        );
-        canvas.drawPath(
-          Path()
-            ..moveTo(3.8, 4)
-            ..lineTo(4.6, 13.6)
-            ..lineTo(11.4, 13.6)
-            ..lineTo(12.2, 4),
-          stroke,
-        );
-      case EmulatorIcon.copy:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(2.2, 2.2, 8, 9.6),
-            const Radius.circular(1.4),
-          ),
-          stroke,
-        );
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(5.8, 4.6, 8, 9.6),
-            const Radius.circular(1.4),
-          ),
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.4
-            ..strokeJoin = StrokeJoin.round,
-        );
-      case EmulatorIcon.check:
-        canvas.drawPath(
-          Path()
-            ..moveTo(3, 8.4)
-            ..lineTo(6.6, 12)
-            ..lineTo(13, 4.4),
-          stroke..strokeWidth = 1.8,
-        );
+      case EmulatorIcon.speedDouble:
+        _chevron(canvas, stroke, 4.5);
+        _chevron(canvas, stroke, 8.5);
+      case EmulatorIcon.speedQuad:
+        _chevron(canvas, stroke, 3);
+        _chevron(canvas, stroke, 6.8);
+        _chevron(canvas, stroke, 10.6);
     }
 
     canvas.restore();
+  }
+
+  void _chevron(Canvas canvas, Paint paint, double x, {bool left = false}) {
+    final dx = left ? -3.5 : 3.5;
+    canvas.drawPath(
+      Path()
+        ..moveTo(left ? x + 3.5 : x, 4)
+        ..lineTo((left ? x + 3.5 : x) + dx, 8)
+        ..lineTo(left ? x + 3.5 : x, 12),
+      paint,
+    );
   }
 
   RRect _bar(double x, double y, double w, double h) => RRect.fromRectAndRadius(

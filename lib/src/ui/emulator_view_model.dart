@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core_library.dart';
 import '../display_style.dart';
+import '../emulator_assistant.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
@@ -146,6 +147,22 @@ class EmulatorViewModel extends ChangeNotifier {
   EmulatorSpeed get speed => session.speed;
   List<String> get logLines => session.logLines;
 
+  /// The player's answer, and only that — nothing here captures play yet.
+  /// A host that records (frame, action) pairs reads this before it starts,
+  /// and it defaults to no.
+  bool _sharesTrainingData = false;
+  bool get sharesTrainingData => _sharesTrainingData;
+
+  void toggleTrainingData() {
+    _sharesTrainingData = !_sharesTrainingData;
+    session.log(
+      _sharesTrainingData
+          ? 'share training data'
+          : 'do not share training data',
+    );
+    notifyListeners();
+  }
+
   /// null is the raw picture; cycling walks the styles and returns to it.
   DisplayStyle? _style = DisplayStyle.vhs;
   DisplayStyle? get style => _style;
@@ -163,12 +180,36 @@ class EmulatorViewModel extends ChangeNotifier {
     };
     final audio = _style?.audio ?? StyleAudio.clean;
     session.setAudioQuality(bits: audio.bits, mono: audio.mono);
-    session.log('display ${_style?.label ?? 'raw'}');
+    session.log(_style?.label.toLowerCase() ?? 'raw');
     notifyListeners();
   }
 
   List<EmulatorButton> get buttonLog => session.buttonLog;
   List<PadElement> get padLog => session.padLog;
+
+  /// Hosts hand one in — Palapa its own harness, the workbench an
+  /// [HttpAssistant] built from whatever endpoint the user typed.
+  EmulatorAssistant? assistant;
+
+  /// Null when no assistant is connected.
+  Future<String>? askAssistant(String question) {
+    final assistant = this.assistant;
+    if (assistant == null) return null;
+
+    return assistant.ask(
+      question,
+      EmulatorAssistantContext(
+        romTitle: session.rom?.title ?? 'no cartridge',
+        system: RomSystem.of(session.rom?.path ?? '')?.label ?? 'unknown',
+        coreName: session.coreName,
+        logLines: session.logLines.length > 20
+            ? session.logLines.sublist(session.logLines.length - 20)
+            : session.logLines,
+        recentButtons: [for (final b in session.padLog) b.label],
+      ),
+    );
+  }
+
   int get heldMask => session.heldMask;
   int get padMask => session.padMask;
   String? get padName => session.padName;
@@ -228,9 +269,15 @@ class EmulatorViewModel extends ChangeNotifier {
     // a free swap, but a preview is half resolution with no sound — promoting
     // one put a thumbnail on the screen, and left the cartridge you stepped
     // away from emulating at full rate for nobody.
+    final parked = _focused.rom;
+    if (parked != null && _focused.isRunning) {
+      session.log('parked ${parked.title}');
+    }
     _park(_focused, _resumeSlot);
     _focused.play(rom);
+    final resumed = hasState(rom, _resumeSlot);
     await _resume(_focused, rom, _resumeSlot);
+    if (resumed) session.log('resumed ${rom.title}');
     if (_previewsRunning) await _startPreviews();
     notifyListeners();
   }
@@ -251,18 +298,21 @@ class EmulatorViewModel extends ChangeNotifier {
   static const _previewSlot = 4;
   static const _resumeSlot = 5;
 
-  void _park(EmulatorSession session, int slot) {
-    final rom = session.rom;
-    if (rom == null || !session.isRunning) return;
-    final state = session.saveState();
+  // Silent: previews park and resume constantly as the shelf scrolls, and a
+  // log that narrates them buries the player's own actions. play() speaks for
+  // the one move the player made.
+  void _park(EmulatorSession target, int slot) {
+    final rom = target.rom;
+    if (rom == null || !target.isRunning) return;
+    final state = target.saveState();
     if (state == null) return;
     unawaited(File(_slotPath(rom, slot)).writeAsBytes(state));
   }
 
-  Future<void> _resume(EmulatorSession session, RomFile rom, int slot) async {
+  Future<void> _resume(EmulatorSession target, RomFile rom, int slot) async {
     final file = File(_slotPath(rom, slot));
     if (!file.existsSync()) return;
-    session.loadState(await file.readAsBytes());
+    target.loadState(await file.readAsBytes());
   }
 
   String _slotPath(RomFile rom, int slot) => '${rom.path}.state$slot';
