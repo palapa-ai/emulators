@@ -14,7 +14,7 @@
    click, short enough that input does not lag behind the picture. */
 #define AUDIO_RING_FRAMES 8192
 #define AUDIO_BUFFER_FRAMES 512
-#define AUDIO_BUFFER_COUNT 3
+#define AUDIO_BUFFER_COUNT 4
 
 struct EmuSession {
    void *lib;
@@ -49,8 +49,13 @@ struct EmuSession {
    int audio_read, audio_write;
    pthread_mutex_t audio_lock;
    AudioQueueRef audio_queue;
+   int audio_muted;
+   int audio_bits;
+   int audio_mono;
+   int audio_discard;
 
    int16_t buttons[EMU_BUTTON_COUNT];
+   int16_t last_input_mask;
 
    struct retro_system_info info;
    struct retro_system_av_info av;
@@ -58,8 +63,11 @@ struct EmuSession {
    char system_dir[1024];
 };
 
-/* The core's callbacks carry no user pointer, so the active session has to be
-   reachable from file scope. */
+/* The core's callbacks carry no user pointer, so the session in play has to be
+   reachable from file scope. retro_run and friends are synchronous, so every
+   entry point claims it first and the callbacks land on the right session —
+   which is what lets several run at once, each with its own copy of the core
+   and therefore its own globals. */
 static EmuSession *active;
 
 static void cb_log(enum retro_log_level level, const char *fmt, ...)
@@ -80,6 +88,9 @@ static bool cb_environment(unsigned cmd, void *data)
    {
       case RETRO_ENVIRONMENT_GET_CAN_DUPE:
          *(bool *)data = true;
+         return true;
+
+      case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS:
          return true;
 
       case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
@@ -210,11 +221,44 @@ static int ring_read(EmuSession *s, int16_t *out, int frames)
 
 static void push_audio(const int16_t *data, size_t frames)
 {
-   if (!active)
+   if (!active || active->audio_discard)
       return;
 
    pthread_mutex_lock(&active->audio_lock);
-   ring_write(active, data, (int)frames);
+
+   if (active->audio_bits >= 16 && !active->audio_mono)
+   {
+      ring_write(active, data, (int)frames);
+   }
+   else
+   {
+      int16_t scratch[512];
+      int shift = 16 - (active->audio_bits < 2 ? 2 : active->audio_bits);
+      size_t done = 0;
+
+      while (done < frames)
+      {
+         size_t chunk = frames - done;
+         if (chunk > 256)
+            chunk = 256;
+
+         for (size_t i = 0; i < chunk; i++)
+         {
+            int16_t l = data[(done + i) * 2];
+            int16_t r = data[(done + i) * 2 + 1];
+
+            if (active->audio_mono)
+               l = r = (int16_t)(((int)l + r) / 2);
+
+            scratch[i * 2] = (int16_t)((l >> shift) << shift);
+            scratch[i * 2 + 1] = (int16_t)((r >> shift) << shift);
+         }
+
+         ring_write(active, scratch, (int)chunk);
+         done += chunk;
+      }
+   }
+
    pthread_mutex_unlock(&active->audio_lock);
 }
 
@@ -233,6 +277,9 @@ static void audio_callback(void *user, AudioQueueRef queue,
    if (got < AUDIO_BUFFER_FRAMES)
       memset(out + (size_t)got * 2, 0,
             (size_t)(AUDIO_BUFFER_FRAMES - got) * 4);
+
+   if (s->audio_muted)
+      memset(out, 0, AUDIO_BUFFER_FRAMES * 4);
 
    buffer->mAudioDataByteSize = AUDIO_BUFFER_FRAMES * 4;
    AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);
@@ -257,8 +304,20 @@ static int16_t cb_input_state(unsigned port, unsigned device, unsigned index,
 {
    (void)index;
 
-   if (!active || port != 0 || device != RETRO_DEVICE_JOYPAD
-         || id >= EMU_BUTTON_COUNT)
+   if (!active || port != 0 || device != RETRO_DEVICE_JOYPAD)
+      return 0;
+
+   if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
+   {
+      int16_t mask = 0;
+      for (int i = 0; i < EMU_BUTTON_COUNT; i++)
+         if (active->buttons[i])
+            mask |= (int16_t)(1 << i);
+      active->last_input_mask = mask;
+      return mask;
+   }
+
+   if (id >= EMU_BUTTON_COUNT)
       return 0;
 
    return active->buttons[id];
@@ -278,12 +337,6 @@ static void fail(char *err, size_t err_len, const char *msg)
 EmuSession *emu_open(const char *core_path, const char *rom_path,
       char *err, size_t err_len)
 {
-   if (active)
-   {
-      fail(err, err_len, "a session is already open");
-      return NULL;
-   }
-
    EmuSession *s = calloc(1, sizeof(*s));
    if (!s)
    {
@@ -292,6 +345,7 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    }
 
    s->pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+   s->audio_bits = 16;
    snprintf(s->system_dir, sizeof(s->system_dir), ".");
 
    s->lib = dlopen(core_path, RTLD_LAZY);
@@ -375,6 +429,7 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
 
    struct retro_game_info game = { rom_path, s->rom, size, NULL };
 
+   active = s;
    if (!s->load_game(&game))
    {
       fail(err, err_len, "core rejected the rom");
@@ -394,6 +449,7 @@ void emu_close(EmuSession *s)
 
    emu_audio_stop(s);
 
+   active = s;
    if (s->unload_game)
       s->unload_game();
    if (s->deinit)
@@ -414,8 +470,11 @@ void emu_close(EmuSession *s)
 
 void emu_run_frame(EmuSession *s)
 {
-   if (s && s->run)
-      s->run();
+   if (!s || !s->run)
+      return;
+
+   active = s;
+   s->run();
 }
 
 const uint32_t *emu_frame_pixels(EmuSession *s) { return s ? s->pixels : NULL; }
@@ -442,6 +501,40 @@ int emu_audio_queued(EmuSession *s)
    int filled = ring_filled(s);
    pthread_mutex_unlock(&s->audio_lock);
    return filled;
+}
+
+void emu_audio_set_muted(EmuSession *s, int muted)
+{
+   if (s)
+      s->audio_muted = muted ? 1 : 0;
+}
+
+void emu_audio_set_quality(EmuSession *s, int bits, int mono)
+{
+   if (!s)
+      return;
+
+   pthread_mutex_lock(&s->audio_lock);
+   s->audio_bits = bits;
+   s->audio_mono = mono ? 1 : 0;
+   pthread_mutex_unlock(&s->audio_lock);
+}
+
+void emu_audio_set_discard(EmuSession *s, int discard)
+{
+   if (!s)
+      return;
+
+   pthread_mutex_lock(&s->audio_lock);
+   s->audio_discard = discard ? 1 : 0;
+   if (s->audio_discard)
+      s->audio_read = s->audio_write;
+   pthread_mutex_unlock(&s->audio_lock);
+}
+
+int emu_audio_muted(EmuSession *s)
+{
+   return s ? s->audio_muted : 0;
 }
 
 int emu_audio_start(EmuSession *s)
@@ -502,8 +595,16 @@ void emu_set_button(EmuSession *s, int button, int pressed)
 
 void emu_reset(EmuSession *s)
 {
-   if (s && s->reset)
-      s->reset();
+   if (!s || !s->reset)
+      return;
+
+   active = s;
+   s->reset();
+}
+
+int emu_last_input_mask(EmuSession *s)
+{
+   return s ? s->last_input_mask : 0;
 }
 
 double emu_fps(EmuSession *s) { return s ? s->av.timing.fps : 0.0; }
@@ -533,12 +634,20 @@ size_t emu_state_size(EmuSession *s)
 
 int emu_state_save(EmuSession *s, void *buf, size_t len)
 {
-   return s && s->serialize && s->serialize(buf, len) ? 1 : 0;
+   if (!s || !s->serialize)
+      return 0;
+
+   active = s;
+   return s->serialize(buf, len) ? 1 : 0;
 }
 
 int emu_state_load(EmuSession *s, const void *buf, size_t len)
 {
-   return s && s->unserialize && s->unserialize(buf, len) ? 1 : 0;
+   if (!s || !s->unserialize)
+      return 0;
+
+   active = s;
+   return s->unserialize(buf, len) ? 1 : 0;
 }
 
 size_t emu_sram_size(EmuSession *s)
@@ -551,4 +660,16 @@ void *emu_sram_data(EmuSession *s)
 {
    return s && s->get_memory_data
          ? s->get_memory_data(RETRO_MEMORY_SAVE_RAM) : NULL;
+}
+
+size_t emu_ram_size(EmuSession *s)
+{
+   return s && s->get_memory_size
+         ? s->get_memory_size(RETRO_MEMORY_SYSTEM_RAM) : 0;
+}
+
+void *emu_ram_data(EmuSession *s)
+{
+   return s && s->get_memory_data
+         ? s->get_memory_data(RETRO_MEMORY_SYSTEM_RAM) : NULL;
 }

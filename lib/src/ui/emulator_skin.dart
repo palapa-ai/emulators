@@ -1,6 +1,47 @@
 import 'package:flutter/widgets.dart';
 
+import 'emulator_glyph.dart';
+
 enum EmulatorTextRole { heading, body, caption }
+
+/// One hand cursor for everything tappable, wherever it is drawn.
+extension EmulatorTappable on Widget {
+  Widget get clickable =>
+      MouseRegion(cursor: SystemMouseCursors.click, child: this);
+}
+
+/// Named rather than drawn here, so a host can map them onto its own icon set
+/// without the package depending on one.
+enum EmulatorIcon {
+  reset,
+  eject,
+  controller,
+  pause,
+  play,
+  delete,
+  sound,
+  muted,
+  save,
+  load,
+  copy,
+  check,
+  fullscreen,
+  fullscreenExit,
+  styleRaw,
+  styleVhs,
+  styleTrinitron,
+  styleArcade,
+  styleHomeTv,
+  styleDotMatrix,
+  styleNes,
+  styleGameBoy,
+  styleComposite,
+  speedQuarter,
+  speedHalf,
+  speedNormal,
+  speedDouble,
+  speedQuad,
+}
 
 /// How the package draws its own chrome.
 ///
@@ -48,15 +89,66 @@ class EmulatorSkin {
     BuildContext context, {
     required String label,
     required VoidCallback onTap,
-  }) => GestureDetector(
+    EmulatorIcon? icon,
+    VoidCallback? onSecondaryTap,
+  }) => _Hoverable(
     onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+    onSecondaryTap: onSecondaryTap,
+    builder: (hovered) => Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: icon == null ? 12 : 8,
+        vertical: 7,
+      ),
       decoration: BoxDecoration(
-        border: Border.all(color: line(context)),
+        color: hovered ? accent(context).withValues(alpha: 0.12) : null,
+        border: Border.all(color: hovered ? accent(context) : line(context)),
         borderRadius: BorderRadius.circular(5),
       ),
-      child: text(context, label, role: EmulatorTextRole.caption),
+      child: icon == null
+          ? text(context, label, role: EmulatorTextRole.caption)
+          : EmulatorGlyph(
+              icon,
+              color: hovered
+                  ? accent(context)
+                  : textStyle(context, EmulatorTextRole.caption).color,
+            ),
+    ),
+  );
+
+  /// A titled region. The default is a plain bordered box; hosts with a
+  /// design system draw their own.
+  Widget panel(
+    BuildContext context, {
+    required String title,
+    required Widget child,
+    List<Widget> leading = const [],
+    List<Widget> trailing = const [],
+    bool fill = false,
+  }) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      border: Border.all(color: line(context)),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (title.isNotEmpty || leading.isNotEmpty || trailing.isNotEmpty) ...[
+          Row(
+            children: [
+              if (title.isNotEmpty)
+                text(context, title, role: EmulatorTextRole.heading),
+              ...leading,
+              const Spacer(),
+              ...trailing,
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+        // Only a panel the caller gave a bounded height may take the slack;
+        // a flex child in a wrap-content column would assert.
+        if (fill) Expanded(child: child) else child,
+      ],
     ),
   );
 
@@ -86,7 +178,7 @@ class EmulatorSkin {
         ],
       ),
     ),
-  );
+  ).clickable;
 }
 
 class EmulatorTheme extends InheritedWidget {
@@ -100,4 +192,34 @@ class EmulatorTheme extends InheritedWidget {
 
   @override
   bool updateShouldNotify(EmulatorTheme oldWidget) => skin != oldWidget.skin;
+}
+
+class _Hoverable extends StatefulWidget {
+  const _Hoverable({
+    required this.onTap,
+    required this.builder,
+    this.onSecondaryTap,
+  });
+
+  final VoidCallback onTap;
+  final VoidCallback? onSecondaryTap;
+  final Widget Function(bool hovered) builder;
+
+  @override
+  State<_Hoverable> createState() => _HoverableState();
+}
+
+class _HoverableState extends State<_Hoverable> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => setState(() => _hovered = true),
+    onExit: (_) => setState(() => _hovered = false),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      onSecondaryTap: widget.onSecondaryTap,
+      child: widget.builder(_hovered),
+    ).clickable,
+  );
 }

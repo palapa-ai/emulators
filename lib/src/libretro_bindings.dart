@@ -1,7 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:ffi/ffi.dart';
+import 'native_memory.dart';
 
 final class EmuSession extends Opaque {}
 
@@ -53,6 +53,10 @@ typedef EmuSramData = Pointer<Void> Function(Pointer<EmuSession>);
 
 typedef _IntFromSessionNative = Int Function(Pointer<EmuSession>);
 typedef EmuIntFromSession = int Function(Pointer<EmuSession>);
+typedef _SetMutedNative = Void Function(Pointer<EmuSession>, Int);
+typedef EmuSetMuted = void Function(Pointer<EmuSession>, int);
+typedef _SetQualityNative = Void Function(Pointer<EmuSession>, Int, Int);
+typedef EmuSetQuality = void Function(Pointer<EmuSession>, int, int);
 
 /// Thin `dart:ffi` surface over `src/libretro_host.c`. Holds no policy — the
 /// decisions live in [Emulator].
@@ -113,6 +117,12 @@ class LibretroBindings {
       sramData = lib.lookupFunction<_SramDataNative, EmuSramData>(
         'emu_sram_data',
       ),
+      ramSize = lib.lookupFunction<_SizeSessionNative, EmuSizeSession>(
+        'emu_ram_size',
+      ),
+      ramData = lib.lookupFunction<_SramDataNative, EmuSramData>(
+        'emu_ram_data',
+      ),
       audioStart = lib.lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
         'emu_audio_start',
       ),
@@ -122,16 +132,28 @@ class LibretroBindings {
       audioQueued = lib
           .lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
             'emu_audio_queued',
-          );
+          ),
+      audioSetMuted = lib.lookupFunction<_SetMutedNative, EmuSetMuted>(
+        'emu_audio_set_muted',
+      ),
+      audioMuted = lib.lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
+        'emu_audio_muted',
+      ),
+      audioSetQuality = lib.lookupFunction<_SetQualityNative, EmuSetQuality>(
+        'emu_audio_set_quality',
+      ),
+      audioSetDiscard = lib.lookupFunction<_SetMutedNative, EmuSetMuted>(
+        'emu_audio_set_discard',
+      );
 
   /// Apple builds link the plugin statically into the app binary, so the
   /// symbols are already in the process and there is no library to open.
   factory LibretroBindings.open() => LibretroBindings._(
     Platform.isMacOS || Platform.isIOS
         ? DynamicLibrary.process()
-        : DynamicLibrary.open(Platform.isWindows
-              ? 'emulators.dll'
-              : 'libemulators.so'),
+        : DynamicLibrary.open(
+            Platform.isWindows ? 'emulators.dll' : 'libemulators.so',
+          ),
   );
 
   final EmuOpen open;
@@ -153,7 +175,13 @@ class LibretroBindings {
   final EmuStateIo stateLoad;
   final EmuSizeSession sramSize;
   final EmuSramData sramData;
+  final EmuSizeSession ramSize;
+  final EmuSramData ramData;
   final EmuIntFromSession audioStart;
   final EmuVoidSession audioStop;
   final EmuIntFromSession audioQueued;
+  final EmuSetMuted audioSetMuted;
+  final EmuIntFromSession audioMuted;
+  final EmuSetQuality audioSetQuality;
+  final EmuSetMuted audioSetDiscard;
 }

@@ -1,5 +1,31 @@
 import 'dart:io';
 
+import 'rom_notes.dart';
+
+/// Which machine a cartridge belongs to, taken from its extension — the
+/// shelf is grouped by system even when only one of them has anything in it.
+/// Only machines a bundled core can actually run are listed; NES and N64
+/// return when their cores do.
+enum RomSystem {
+  snes('SNES', {'.sfc', '.smc', '.fig', '.swc'});
+
+  const RomSystem(this.label, this.extensions);
+
+  final String label;
+  final Set<String> extensions;
+
+  static RomSystem? of(String path) {
+    final dot = path.lastIndexOf('.');
+    if (dot == -1) return null;
+
+    final extension = path.substring(dot).toLowerCase();
+    for (final system in values) {
+      if (system.extensions.contains(extension)) return system;
+    }
+    return null;
+  }
+}
+
 class RomFile {
   const RomFile({
     required this.path,
@@ -20,7 +46,11 @@ class RomFile {
   final String title;
   final int sizeBytes;
 
-  static const extensions = {'.sfc', '.smc', '.fig', '.swc'};
+  String? get note => RomNotes.forTitle(title);
+
+  static final extensions = {
+    for (final system in RomSystem.values) ...system.extensions,
+  };
 
   static bool isRom(String path) =>
       extensions.contains(_extensionOf(path).toLowerCase());
@@ -43,6 +73,10 @@ class RomFile {
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }
+
+  RomSystem? get system => RomSystem.of(path);
+
+  String get fileName => path.split(Platform.pathSeparator).last;
 
   String get sizeLabel => sizeBytes >= 1048576
       ? '${(sizeBytes / 1048576).toStringAsFixed(1)} MB'
