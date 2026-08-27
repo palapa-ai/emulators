@@ -1,4 +1,4 @@
-name: emulators
+name: agentic_emulator
 description: >-
   Console emulation for Flutter. Wraps libretro cores behind a Dart API, with
   save states, period display shaders and a seam for a language model.

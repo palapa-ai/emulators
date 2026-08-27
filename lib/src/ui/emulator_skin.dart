@@ -25,6 +25,7 @@ enum EmulatorIcon {
   load,
   copy,
   check,
+  training,
   fullscreen,
   fullscreenExit,
   styleRaw,
@@ -91,6 +92,7 @@ class EmulatorSkin {
     required VoidCallback onTap,
     EmulatorIcon? icon,
     VoidCallback? onSecondaryTap,
+    bool labelled = false,
   }) => _Hoverable(
     onTap: onTap,
     onSecondaryTap: onSecondaryTap,
@@ -104,16 +106,27 @@ class EmulatorSkin {
         border: Border.all(color: hovered ? accent(context) : line(context)),
         borderRadius: BorderRadius.circular(5),
       ),
-      child: icon == null
-          ? text(context, label, role: EmulatorTextRole.caption)
-          : EmulatorGlyph(
-              icon,
-              color: hovered
-                  ? accent(context)
-                  : textStyle(context, EmulatorTextRole.caption).color,
-            ),
+      child: switch ((icon, labelled)) {
+        (null, _) => text(context, label, role: EmulatorTextRole.caption),
+        (final icon?, false) => EmulatorGlyph(
+          icon,
+          color: _tone(context, hovered),
+        ),
+        (final icon?, true) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            EmulatorGlyph(icon, size: 13, color: _tone(context, hovered)),
+            const SizedBox(width: 6),
+            text(context, label, role: EmulatorTextRole.caption),
+          ],
+        ),
+      },
     ),
   );
+
+  Color? _tone(BuildContext context, bool hovered) => hovered
+      ? accent(context)
+      : textStyle(context, EmulatorTextRole.caption).color;
 
   /// A titled region. The default is a plain bordered box; hosts with a
   /// design system draw their own.

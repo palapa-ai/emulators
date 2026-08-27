@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:emulators/emulators.dart';
+import 'package:agentic_emulator/emulators.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -540,21 +540,45 @@ class _PadTicker extends StatelessWidget {
           label: viewModel.sharesTrainingData
               ? 'share training data'
               : 'do not share training data',
+          icon: EmulatorIcon.training,
+          labelled: true,
           onTap: viewModel.toggleTrainingData,
         ),
       ],
       trailing: [
         if (viewModel.padName case final pad?)
-          skin.text(context, pad, role: EmulatorTextRole.caption)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const EmulatorGlyph(
+                EmulatorIcon.controller,
+                size: 13,
+                color: Color(0x8ce8e8ee),
+              ),
+              const SizedBox(width: 6),
+              skin.text(context, pad, role: EmulatorTextRole.caption),
+            ],
+          )
         else
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: ControllerPairing.open,
-              child: skin.text(
-                context,
-                'Connect controller',
-                role: EmulatorTextRole.caption,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const EmulatorGlyph(
+                    EmulatorIcon.controller,
+                    size: 13,
+                    color: Color(0x8ce8e8ee),
+                  ),
+                  const SizedBox(width: 6),
+                  skin.text(
+                    context,
+                    'Connect controller',
+                    role: EmulatorTextRole.caption,
+                  ),
+                ],
               ),
             ),
           ),

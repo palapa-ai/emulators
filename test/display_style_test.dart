@@ -1,4 +1,4 @@
-import 'package:emulators/emulators.dart';
+import 'package:agentic_emulator/emulators.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

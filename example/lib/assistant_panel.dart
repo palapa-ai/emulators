@@ -1,4 +1,4 @@
-import 'package:emulators/emulators.dart';
+import 'package:agentic_emulator/emulators.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -92,7 +92,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
               for (final example in const [
                 'make chun li fat',
                 'frame generate 60fps',
-                'replace yoshi with wario snes kart',
+                'replace yoshi with wario',
               ])
                 skin.button(
                   context,

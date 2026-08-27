@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:emulators/emulators.dart';
+import 'package:agentic_emulator/emulators.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 

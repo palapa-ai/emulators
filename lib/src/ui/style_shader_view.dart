@@ -33,8 +33,8 @@ class _StyleShaderViewState extends State<StyleShaderView>
   double _seconds = 0;
 
   String get _asset => widget.style.shader
-      ? 'packages/emulators/shaders/vhs.frag'
-      : 'packages/emulators/shaders/crt.frag';
+      ? 'packages/agentic_emulator/shaders/vhs.frag'
+      : 'packages/agentic_emulator/shaders/crt.frag';
 
   @override
   void initState() {
