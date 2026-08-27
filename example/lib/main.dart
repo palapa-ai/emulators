@@ -105,12 +105,6 @@ class _WorkbenchState extends State<_Workbench> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: _showApi
-                        ? ApiPanel(viewModel: _viewModel, skin: skin)
-                        : AssistantPanel(viewModel: _viewModel, skin: skin),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
                     child: _Log(viewModel: _viewModel, skin: skin),
                   ),
                   const SizedBox(width: 12),
@@ -122,7 +116,25 @@ class _WorkbenchState extends State<_Workbench> {
                 children: [
                   SizedBox(
                     width: 570,
-                    child: _Library(viewModel: _viewModel, skin: skin),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // The model's half of the workbench, over the shelf
+                        // it is talking about.
+                        Expanded(
+                          child: _showApi
+                              ? ApiPanel(viewModel: _viewModel, skin: skin)
+                              : AssistantPanel(
+                                  viewModel: _viewModel,
+                                  skin: skin,
+                                ),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: _Library(viewModel: _viewModel, skin: skin),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -146,24 +158,15 @@ class _WorkbenchState extends State<_Workbench> {
                                 ),
                               ],
                             ),
-                            transportTrailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                skin.button(
-                                  context,
-                                  label: _showApi ? 'Assistant' : 'API',
-                                  onTap: () =>
-                                      setState(() => _showApi = !_showApi),
-                                ),
-                                const SizedBox(width: 8),
-                                skin.button(
-                                  context,
-                                  label: 'Fullscreen',
-                                  icon: EmulatorIcon.fullscreen,
-                                  onTap: () => _drop.invokeMethod('fullscreen'),
-                                ),
-                              ],
+                            transportTrailing: skin.button(
+                              context,
+                              label: _showApi ? 'Assistant' : 'API',
+                              onTap: () => setState(() => _showApi = !_showApi),
                             ),
+                            // The package hides its own chrome; the window
+                            // still has to be told to fill the display.
+                            onFullscreen: (on) =>
+                                _drop.invokeMethod('fullscreen', on),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -531,7 +534,7 @@ class _PadTicker extends StatelessWidget {
     return skin.panel(
       context,
       title: '',
-      trailing: [
+      leading: [
         skin.button(
           context,
           label: viewModel.sharesTrainingData
@@ -539,7 +542,8 @@ class _PadTicker extends StatelessWidget {
               : 'do not share training data',
           onTap: viewModel.toggleTrainingData,
         ),
-        const SizedBox(width: 12),
+      ],
+      trailing: [
         if (viewModel.padName case final pad?)
           skin.text(context, pad, role: EmulatorTextRole.caption)
         else

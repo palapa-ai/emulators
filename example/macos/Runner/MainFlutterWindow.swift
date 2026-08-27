@@ -32,7 +32,12 @@ class MainFlutterWindow: NSWindow {
         self?.romExtensions = Set(extensions.map { $0.lowercased() })
         result(nil)
       case "fullscreen":
-        self?.toggleFullScreen(nil)
+        // Told the state to be in, not to flip — the package decides, and a
+        // window already there must not be toggled back out.
+        let wanted = call.arguments as? Bool ?? false
+        let isFull =
+          self?.styleMask.contains(.fullScreen) ?? false
+        if wanted != isFull { self?.toggleFullScreen(nil) }
         result(nil)
       default:
         result(FlutterMethodNotImplemented)

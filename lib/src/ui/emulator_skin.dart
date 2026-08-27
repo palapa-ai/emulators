@@ -26,6 +26,7 @@ enum EmulatorIcon {
   copy,
   check,
   fullscreen,
+  fullscreenExit,
   styleRaw,
   styleVhs,
   styleTrinitron,
@@ -120,6 +121,7 @@ class EmulatorSkin {
     BuildContext context, {
     required String title,
     required Widget child,
+    List<Widget> leading = const [],
     List<Widget> trailing = const [],
     bool fill = false,
   }) => Container(
@@ -131,11 +133,12 @@ class EmulatorSkin {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (title.isNotEmpty || trailing.isNotEmpty) ...[
+        if (title.isNotEmpty || leading.isNotEmpty || trailing.isNotEmpty) ...[
           Row(
             children: [
               if (title.isNotEmpty)
                 text(context, title, role: EmulatorTextRole.heading),
+              ...leading,
               const Spacer(),
               ...trailing,
             ],
