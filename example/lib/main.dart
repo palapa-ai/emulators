@@ -6,6 +6,8 @@ import 'package:emulators/emulators.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'assistant_panel.dart';
+
 void main() => runApp(const EmulatorsExample());
 
 String get _defaultCore =>
@@ -15,6 +17,7 @@ String get _defaultCore =>
 String get _defaultLibrary => '${Platform.environment['HOME']}/Desktop/palapa';
 
 const _core = String.fromEnvironment('CORE');
+
 const _library = String.fromEnvironment('LIBRARY');
 
 class EmulatorsExample extends StatelessWidget {
@@ -93,7 +96,24 @@ class _WorkbenchState extends State<_Workbench> {
             padding: const EdgeInsets.all(12),
             child: ListenableBuilder(
               listenable: _viewModel,
-              builder: (context, _) => Row(
+              // Built once, not per notification: they drive themselves, and
+              // an identical child skips rebuilding, so a button press does
+              // not re-run every visible hex row.
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: AssistantPanel(viewModel: _viewModel, skin: skin),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _Log(viewModel: _viewModel, skin: skin),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: MemoryView(viewModel: _viewModel)),
+                ],
+              ),
+              builder: (context, bottomRow) => Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
@@ -122,15 +142,18 @@ class _WorkbenchState extends State<_Workbench> {
                                 ),
                               ],
                             ),
+                            transportTrailing: skin.button(
+                              context,
+                              label: 'Fullscreen',
+                              icon: EmulatorIcon.fullscreen,
+                              onTap: () => _drop.invokeMethod('fullscreen'),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
                         _PadTicker(viewModel: _viewModel, skin: skin),
                         const SizedBox(height: 12),
-                        Expanded(
-                          flex: 2,
-                          child: _Log(viewModel: _viewModel, skin: skin),
-                        ),
+                        Expanded(flex: 2, child: bottomRow ?? const SizedBox()),
                       ],
                     ),
                   ),
@@ -167,24 +190,43 @@ class _Library extends StatelessWidget {
       // Lazy on purpose: a card only exists while it is near the viewport,
       // which is what tells the view model to run or drop its preview.
       child: Expanded(
-        child: ListView.builder(
-          padding: EdgeInsets.zero,
-          itemCount: roms.length,
-          itemBuilder: (context, i) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _PreviewScope(
-              key: ValueKey(roms[i].path),
-              viewModel: viewModel,
-              rom: roms[i],
-              child: _LibraryCard(
-                viewModel: viewModel,
-                skin: skin,
-                rom: roms[i],
-                playing: roms[i] == viewModel.playing,
+        child: roms.isEmpty
+            ? Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const EmulatorGlyph(
+                      EmulatorIcon.load,
+                      size: 18,
+                      color: Color(0x8ce8e8ee),
+                    ),
+                    const SizedBox(width: 8),
+                    skin.text(
+                      context,
+                      'Drag and drop cartridges here',
+                      role: EmulatorTextRole.caption,
+                    ),
+                  ],
+                ),
+              )
+            : ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: roms.length,
+                itemBuilder: (context, i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _PreviewScope(
+                    key: ValueKey(roms[i].path),
+                    viewModel: viewModel,
+                    rom: roms[i],
+                    child: _LibraryCard(
+                      viewModel: viewModel,
+                      skin: skin,
+                      rom: roms[i],
+                      playing: roms[i] == viewModel.playing,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -271,28 +313,31 @@ class _LibraryCard extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 120,
-                  child: AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: ColoredBox(
-                      color: skin.screen(context),
-                      // Listening per card keeps one preview's frame from
-                      // rebuilding the whole window.
-                      child: session == null
-                          ? const SizedBox.expand()
-                          : RepaintBoundary(
-                              child: ValueListenableBuilder<ui.Image?>(
-                                valueListenable: session.frames,
-                                builder: (context, frame, _) => frame == null
-                                    ? const SizedBox.expand()
-                                    : RawImage(
-                                        image: frame,
-                                        fit: BoxFit.contain,
-                                        filterQuality: FilterQuality.none,
-                                      ),
-                              ),
+                  // Listening per card keeps one preview's frame from
+                  // rebuilding the whole window. The box takes the frame's
+                  // own shape, so the picture meets its edges with no bars.
+                  child: session == null
+                      ? AspectRatio(
+                          aspectRatio: 4 / 3,
+                          child: ColoredBox(color: skin.screen(context)),
+                        )
+                      : RepaintBoundary(
+                          child: ValueListenableBuilder<ui.Image?>(
+                            valueListenable: session.frames,
+                            builder: (context, frame, _) => AspectRatio(
+                              aspectRatio: frame == null
+                                  ? 4 / 3
+                                  : frame.width / frame.height,
+                              child: frame == null
+                                  ? ColoredBox(color: skin.screen(context))
+                                  : RawImage(
+                                      image: frame,
+                                      fit: BoxFit.fill,
+                                      filterQuality: FilterQuality.none,
+                                    ),
                             ),
-                    ),
-                  ),
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -336,7 +381,7 @@ class _LibraryCard extends StatelessWidget {
                               size: 16,
                               color: Color(0xffe05a5a),
                             ),
-                          ),
+                          ).clickable,
                         ],
                       ),
                     ],
@@ -347,7 +392,7 @@ class _LibraryCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ).clickable;
   }
 }
 
@@ -373,7 +418,11 @@ class _Slots extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (showLabel) skin.text(context, saving ? 'Save' : 'Load'),
+        if (showLabel)
+          EmulatorGlyph(
+            saving ? EmulatorIcon.save : EmulatorIcon.load,
+            size: 16,
+          ),
         for (var slot = 1; slot <= EmulatorViewModel.slotCount; slot++) ...[
           const SizedBox(width: 6),
           GestureDetector(
@@ -390,7 +439,7 @@ class _Slots extends StatelessWidget {
                     : const Color(0x8ce8e8ee),
               ),
             ),
-          ),
+          ).clickable,
         ],
       ],
     );
@@ -449,7 +498,7 @@ class _CopyPathState extends State<_CopyPath> {
           ),
         ],
       ),
-    );
+    ).clickable;
   }
 }
 
@@ -465,8 +514,16 @@ class _PadTicker extends StatelessWidget {
 
     return skin.panel(
       context,
-      title: 'Button Log',
+      title: '',
       trailing: [
+        skin.button(
+          context,
+          label: viewModel.sharesTrainingData
+              ? 'share training data'
+              : 'do not share training data',
+          onTap: viewModel.toggleTrainingData,
+        ),
+        const SizedBox(width: 12),
         if (viewModel.padName case final pad?)
           skin.text(context, pad, role: EmulatorTextRole.caption)
         else
@@ -520,38 +577,39 @@ class _Log extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lines = viewModel.logLines;
-
-    return skin.panel(
-      context,
+    return CollapsingPanel(
       title: 'Log',
-      fill: true,
-      child: ListView.builder(
-        reverse: true,
-        padding: EdgeInsets.zero,
-        itemCount: lines.length,
-        itemBuilder: (_, i) {
-          final row = lines.length - 1 - i;
-          return ColoredBox(
-            color: row.isEven
-                ? const Color(0x00000000)
-                : const Color(0x0affffff),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              child: Text(
-                lines[row],
-                maxLines: 1,
-                style: const TextStyle(
-                  fontFamily: 'Menlo',
-                  fontSize: 10,
-                  height: 1.4,
-                  color: Color(0x99e8e8ee),
-                ),
-              ),
-            ),
-          );
-        },
+      // Listens for itself, so it can sit outside the workbench's rebuild
+      // and only its own list re-runs when a line lands.
+      child: ListenableBuilder(
+        listenable: viewModel,
+        builder: (context, _) => _list(viewModel.logLines),
       ),
     );
   }
+
+  Widget _list(List<String> lines) => ListView.builder(
+    reverse: true,
+    padding: EdgeInsets.zero,
+    itemCount: lines.length,
+    itemBuilder: (_, i) {
+      final row = lines.length - 1 - i;
+      return ColoredBox(
+        color: row.isEven ? const Color(0x00000000) : const Color(0x0affffff),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          child: Text(
+            lines[row],
+            maxLines: 1,
+            style: const TextStyle(
+              fontFamily: 'Menlo',
+              fontSize: 10,
+              height: 1.4,
+              color: Color(0x99e8e8ee),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }

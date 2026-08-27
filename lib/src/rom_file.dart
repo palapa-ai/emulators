@@ -4,10 +4,10 @@ import 'rom_notes.dart';
 
 /// Which machine a cartridge belongs to, taken from its extension — the
 /// shelf is grouped by system even when only one of them has anything in it.
+/// Only machines a bundled core can actually run are listed; NES and N64
+/// return when their cores do.
 enum RomSystem {
-  nes('NES', {'.nes'}),
-  snes('SNES', {'.sfc', '.smc', '.fig', '.swc'}),
-  n64('N64', {'.z64', '.n64', '.v64'});
+  snes('SNES', {'.sfc', '.smc', '.fig', '.swc'});
 
   const RomSystem(this.label, this.extensions);
 

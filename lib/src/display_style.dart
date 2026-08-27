@@ -103,8 +103,8 @@ enum DisplayStyle {
   final Color tint;
   final bool phosphor;
 
-  /// Painted by the fragment shader instead of the geometric overlay — some
-  /// looks are wobble and bleed, which no amount of rectangles will fake.
+  /// Has a whole shader of its own rather than the parameterised pass —
+  /// tape is wobble and bleed, which parameters will not fake.
   final bool shader;
 
   /// A look that isn't only a look — the handheld sounded like its hardware.
@@ -128,40 +128,4 @@ enum DisplayStyle {
   DisplayStyle get previous =>
       values[(index - 1 + values.length) % values.length];
 
-  /// Multiplier for the output pixel at [fx], [fy] within the emulated pixel on
-  /// row [row]. Returned channels are in 0..1 and only ever darken.
-  Color sample(double fx, double fy, int row) {
-    var m = 1.0;
-
-    if (scanline > 0 && fy >= 1 - scanline) {
-      m *= scanlineDepth;
-    }
-    if (verticalStripe > 0 && fx >= 1 - verticalStripe) {
-      m *= verticalStripeDepth;
-    }
-    if (pixelGap > 0 && (fx >= 1 - pixelGap || fy >= 1 - pixelGap)) {
-      m *= pixelGapDepth;
-    }
-
-    var r = 1.0, g = 1.0, b = 1.0;
-
-    if (phosphor) {
-      final band = (fx * 3).floor().clamp(0, 2);
-      switch (band) {
-        case 0:
-          g = b = phosphorDepth;
-        case 1:
-          r = b = phosphorDepth;
-        default:
-          r = g = phosphorDepth;
-      }
-    }
-
-    return Color.from(
-      alpha: 1,
-      red: r * m * tint.r,
-      green: g * m * tint.g,
-      blue: b * m * tint.b,
-    );
-  }
 }

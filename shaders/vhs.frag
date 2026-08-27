@@ -68,11 +68,14 @@ void main() {
   vec3 weight = vec3(0.0);
   float soft = 0.0;
   float softWeight = 0.0;
+  vec3 lens = vec3(0.0);
+  float lensWeight = 0.0;
 
   for (int i = -12; i <= 12; i++) {
     float d = float(i);
-    vec3 s = RGB_TO_YIQ * texture(
+    vec3 rgb = texture(
       uTexture, vec2(clamp(warped.x + d * texel, 0.0, 1.0), warped.y)).rgb;
+    vec3 s = RGB_TO_YIQ * rgb;
 
     // Luma keeps almost all of its detail, I loses most of it and Q nearly
     // all — which is why reds run on tape while edges stay legible.
@@ -85,6 +88,12 @@ void main() {
     float gs = exp(-(d * d) / (2.0 * 2.4 * 2.4));
     soft += s.x * gs;
     softWeight += gs;
+
+    // And the widest: the extra lens everything passed through on the way
+    // to the screen, folded into the same taps.
+    float gl = exp(-(d * d) / (2.0 * 3.0 * 3.0));
+    lens += rgb * gl;
+    lensWeight += gl;
   }
 
   vec3 yiq = acc / weight;
@@ -154,13 +163,7 @@ void main() {
 
   // Everything reaching the screen has been through one more lens than it
   // should have: the picture never resolves fully sharp however good the tape.
-  vec3 soften = vec3(0.0);
-  for (int i = -2; i <= 2; i++) {
-    soften += texture(
-      uTexture,
-      clamp(warped + vec2(float(i) * texel * 1.5, 0.0), 0.0, 1.0)).rgb;
-  }
-  color = mix(color, soften / 5.0, 0.12);
+  color = mix(color, lens / lensWeight, 0.12);
 
   // Scanlines, then worn-head response: soft top end and a lifted black floor.
   color *= 1.0 - 0.05 * step(1.0, mod(floor(uv.y * uSize.y * 0.5), 2.0));
