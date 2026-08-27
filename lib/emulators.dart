@@ -2,6 +2,7 @@ export 'src/controller_pairing.dart';
 export 'src/core_library.dart';
 export 'src/display_style.dart';
 export 'src/emulator.dart' show Emulator, EmulatorException;
+export 'src/emulator_agent.dart';
 export 'src/emulator_assistant.dart';
 export 'src/emulator_button.dart';
 export 'src/emulator_session.dart'

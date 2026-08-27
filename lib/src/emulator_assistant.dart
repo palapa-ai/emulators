@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'emulator_agent.dart';
+
 /// What the assistant can see when it answers: the running game, not the
 /// player's machine.
 class EmulatorAssistantContext {
@@ -24,6 +26,14 @@ class EmulatorAssistantContext {
       'Emulator log:\n${logLines.join('\n')}';
 }
 
+/// An answer, and what the model asked to do to the game alongside it.
+class AssistantReply {
+  const AssistantReply({required this.answer, this.calls = const []});
+
+  final String answer;
+  final List<AgentCall> calls;
+}
+
 /// The seam a host plugs a language model into.
 ///
 /// The package knows what is on screen — the cartridge, the log, the
@@ -31,7 +41,7 @@ class EmulatorAssistantContext {
 /// answers however it likes; [HttpAssistant] is the plain wire-format one for
 /// anything speaking the OpenAI chat shape.
 abstract class EmulatorAssistant {
-  Future<String> ask(String question, EmulatorAssistantContext context);
+  Future<AssistantReply> ask(String question, EmulatorAssistantContext context);
 }
 
 /// Talks to any endpoint speaking the OpenAI chat-completions shape.
@@ -47,7 +57,10 @@ class HttpAssistant extends EmulatorAssistant {
   final String model;
 
   @override
-  Future<String> ask(String question, EmulatorAssistantContext context) async {
+  Future<AssistantReply> ask(
+    String question,
+    EmulatorAssistantContext context,
+  ) async {
     final client = HttpClient();
     try {
       final request = await client.postUrl(
@@ -72,6 +85,9 @@ class HttpAssistant extends EmulatorAssistant {
             'core': context.coreName,
             'inputs': context.recentButtons,
             'log': context.logLines,
+            // What the model may ask for; a reply carries its requests back
+            // in the same envelope as palapa.calls: [{name, args}].
+            'api': EmulatorAgent.api,
           },
         }),
       );
@@ -87,7 +103,14 @@ class HttpAssistant extends EmulatorAssistant {
       final message =
           (choices.first as Map<String, dynamic>)['message']
               as Map<String, dynamic>;
-      return message['content'] as String;
+      final envelope = decoded['palapa'] as Map<String, dynamic>?;
+      return AssistantReply(
+        answer: message['content'] as String? ?? '',
+        calls: [
+          for (final call in (envelope?['calls'] as List?) ?? const [])
+            AgentCall.fromJson(call as Map<String, dynamic>),
+        ],
+      );
     } finally {
       client.close();
     }

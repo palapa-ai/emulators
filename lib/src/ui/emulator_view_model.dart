@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core_library.dart';
 import '../display_style.dart';
+import '../emulator_agent.dart';
 import '../emulator_assistant.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
@@ -191,23 +192,34 @@ class EmulatorViewModel extends ChangeNotifier {
   /// [HttpAssistant] built from whatever endpoint the user typed.
   EmulatorAssistant? assistant;
 
-  /// Null when no assistant is connected.
+  /// The assistant's hands: memory, controls, screenshots, save states,
+  /// always against the game on screen.
+  late final EmulatorAgent agent = EmulatorAgent(_focused);
+
+  /// Null when no assistant is connected. Whatever the reply asked to do is
+  /// done before the answer comes back, so the text can describe the result.
   Future<String>? askAssistant(String question) {
     final assistant = this.assistant;
     if (assistant == null) return null;
 
-    return assistant.ask(
-      question,
-      EmulatorAssistantContext(
-        romTitle: session.rom?.title ?? 'no cartridge',
-        system: RomSystem.of(session.rom?.path ?? '')?.label ?? 'unknown',
-        coreName: session.coreName,
-        logLines: session.logLines.length > 20
-            ? session.logLines.sublist(session.logLines.length - 20)
-            : session.logLines,
-        recentButtons: [for (final b in session.padLog) b.label],
-      ),
-    );
+    return () async {
+      final reply = await assistant.ask(
+        question,
+        EmulatorAssistantContext(
+          romTitle: session.rom?.title ?? 'no cartridge',
+          system: RomSystem.of(session.rom?.path ?? '')?.label ?? 'unknown',
+          coreName: session.coreName,
+          logLines: session.logLines.length > 20
+              ? session.logLines.sublist(session.logLines.length - 20)
+              : session.logLines,
+          recentButtons: [for (final b in session.padLog) b.label],
+        ),
+      );
+      for (final call in reply.calls) {
+        await agent.run(call);
+      }
+      return reply.answer;
+    }();
   }
 
   int get heldMask => session.heldMask;

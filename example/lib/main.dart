@@ -6,6 +6,7 @@ import 'package:emulators/emulators.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'api_panel.dart';
 import 'assistant_panel.dart';
 
 void main() => runApp(const EmulatorsExample());
@@ -50,6 +51,7 @@ class _WorkbenchState extends State<_Workbench> {
   static const _drop = MethodChannel('emulators_example/drop');
 
   bool _over = false;
+  bool _showApi = false;
 
   @override
   void initState() {
@@ -103,7 +105,9 @@ class _WorkbenchState extends State<_Workbench> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: AssistantPanel(viewModel: _viewModel, skin: skin),
+                    child: _showApi
+                        ? ApiPanel(viewModel: _viewModel, skin: skin)
+                        : AssistantPanel(viewModel: _viewModel, skin: skin),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -142,11 +146,23 @@ class _WorkbenchState extends State<_Workbench> {
                                 ),
                               ],
                             ),
-                            transportTrailing: skin.button(
-                              context,
-                              label: 'Fullscreen',
-                              icon: EmulatorIcon.fullscreen,
-                              onTap: () => _drop.invokeMethod('fullscreen'),
+                            transportTrailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                skin.button(
+                                  context,
+                                  label: _showApi ? 'Assistant' : 'API',
+                                  onTap: () =>
+                                      setState(() => _showApi = !_showApi),
+                                ),
+                                const SizedBox(width: 8),
+                                skin.button(
+                                  context,
+                                  label: 'Fullscreen',
+                                  icon: EmulatorIcon.fullscreen,
+                                  onTap: () => _drop.invokeMethod('fullscreen'),
+                                ),
+                              ],
                             ),
                           ),
                         ),
