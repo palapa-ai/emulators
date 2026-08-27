@@ -4,6 +4,12 @@ import 'emulator_glyph.dart';
 
 enum EmulatorTextRole { heading, body, caption }
 
+/// One hand cursor for everything tappable, wherever it is drawn.
+extension EmulatorTappable on Widget {
+  Widget get clickable =>
+      MouseRegion(cursor: SystemMouseCursors.click, child: this);
+}
+
 /// Named rather than drawn here, so a host can map them onto its own icon set
 /// without the package depending on one.
 enum EmulatorIcon {
@@ -13,14 +19,27 @@ enum EmulatorIcon {
   pause,
   play,
   delete,
-  display,
   sound,
   muted,
   save,
   load,
-  speed,
   copy,
   check,
+  fullscreen,
+  styleRaw,
+  styleVhs,
+  styleTrinitron,
+  styleArcade,
+  styleHomeTv,
+  styleDotMatrix,
+  styleNes,
+  styleGameBoy,
+  styleComposite,
+  speedQuarter,
+  speedHalf,
+  speedNormal,
+  speedDouble,
+  speedQuad,
 }
 
 /// How the package draws its own chrome.
@@ -112,14 +131,17 @@ class EmulatorSkin {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            text(context, title, role: EmulatorTextRole.heading),
-            const Spacer(),
-            ...trailing,
-          ],
-        ),
-        const SizedBox(height: 8),
+        if (title.isNotEmpty || trailing.isNotEmpty) ...[
+          Row(
+            children: [
+              if (title.isNotEmpty)
+                text(context, title, role: EmulatorTextRole.heading),
+              const Spacer(),
+              ...trailing,
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         // Only a panel the caller gave a bounded height may take the slack;
         // a flex child in a wrap-content column would assert.
         if (fill) Expanded(child: child) else child,
@@ -153,7 +175,7 @@ class EmulatorSkin {
         ],
       ),
     ),
-  );
+  ).clickable;
 }
 
 class EmulatorTheme extends InheritedWidget {
@@ -189,13 +211,12 @@ class _HoverableState extends State<_Hoverable> {
 
   @override
   Widget build(BuildContext context) => MouseRegion(
-    cursor: SystemMouseCursors.click,
     onEnter: (_) => setState(() => _hovered = true),
     onExit: (_) => setState(() => _hovered = false),
     child: GestureDetector(
       onTap: widget.onTap,
       onSecondaryTap: widget.onSecondaryTap,
       child: widget.builder(_hovered),
-    ),
+    ).clickable,
   );
 }
