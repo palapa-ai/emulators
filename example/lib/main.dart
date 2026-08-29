@@ -538,8 +538,8 @@ class _PadTicker extends StatelessWidget {
         skin.button(
           context,
           label: viewModel.sharesTrainingData
-              ? 'share training data'
-              : 'do not share training data',
+              ? 'sharing training data'
+              : 'not sharing training data',
           icon: EmulatorIcon.training,
           labelled: true,
           onTap: viewModel.toggleTrainingData,
