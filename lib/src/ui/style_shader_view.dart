@@ -33,8 +33,8 @@ class _StyleShaderViewState extends State<StyleShaderView>
   double _seconds = 0;
 
   String get _asset => widget.style.shader
-      ? 'packages/emulator/shaders/vhs.frag'
-      : 'packages/emulator/shaders/crt.frag';
+      ? 'packages/emulator_palapa/shaders/vhs.frag'
+      : 'packages/emulator_palapa/shaders/crt.frag';
 
   @override
   void initState() {

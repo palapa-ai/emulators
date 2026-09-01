@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:emulator/emulator.dart';
+import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:emulator/emulator.dart';
+import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 

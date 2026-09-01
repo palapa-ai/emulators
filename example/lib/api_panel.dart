@@ -1,4 +1,4 @@
-import 'package:emulator/emulator.dart';
+import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/widgets.dart';
 
 /// The agent surface, exercised by hand: every call the assistant may make,

@@ -3,10 +3,10 @@
 import PackageDescription
 
 let package = Package(
-  name: "emulator",
+  name: "emulator_palapa",
   platforms: [.macOS("10.15")],
   products: [
-    .library(name: "emulator", targets: ["emulators", "emulators_host"])
+    .library(name: "emulator-palapa", targets: ["emulators", "emulators_host"])
   ],
   targets: [
     .target(
