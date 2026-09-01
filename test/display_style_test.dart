@@ -1,4 +1,4 @@
-import 'package:agentic_emulator/emulators.dart';
+import 'package:emulator/emulator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -12,5 +12,4 @@ void main() {
     expect(DisplayStyle.values.last.next, DisplayStyle.values.first);
     expect(DisplayStyle.values.first.previous, DisplayStyle.values.last);
   });
-
 }

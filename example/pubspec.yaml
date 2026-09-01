@@ -8,7 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  agentic_emulator:
+  emulator:
     path: ../
 
 flutter:

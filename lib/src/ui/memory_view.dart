@@ -68,20 +68,10 @@ class _MemoryViewState extends State<MemoryView> {
       title: 'Memory',
       trailing: [
         if (ram != null)
-          skin.text(
-            context,
-            '${ram.length ~/ 1024} KB',
-            role: EmulatorTextRole.caption,
-          ),
+          skin.text(context, '${ram.length ~/ 1024} KB', role: .caption),
       ],
       child: ram == null
-          ? Center(
-              child: skin.text(
-                context,
-                'No RAM exposed',
-                role: EmulatorTextRole.caption,
-              ),
-            )
+          ? Center(child: skin.text(context, 'No RAM exposed', role: .caption))
           : LayoutBuilder(
               builder: (context, constraints) {
                 // One line when the panel can hold offset, hex and text side
@@ -180,7 +170,7 @@ class _Row extends StatelessWidget {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: .start,
       children: [
         Text.rich(
           TextSpan(

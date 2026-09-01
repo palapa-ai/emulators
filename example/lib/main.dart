@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:agentic_emulator/emulators.dart';
+import 'package:emulator/emulator.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -27,7 +27,7 @@ class EmulatorsExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WidgetsApp(
-      title: 'Emulator Palapa',
+      title: 'Emulator',
       color: const Color(0xff101014),
       builder: (context, _) => const _Workbench(),
     );
@@ -102,7 +102,7 @@ class _WorkbenchState extends State<_Workbench> {
               // an identical child skips rebuilding, so a button press does
               // not re-run every visible hex row.
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   Expanded(
                     child: _Log(viewModel: _viewModel, skin: skin),
@@ -112,12 +112,12 @@ class _WorkbenchState extends State<_Workbench> {
                 ],
               ),
               builder: (context, bottomRow) => Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   SizedBox(
                     width: 570,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: .stretch,
                       children: [
                         // The model's half of the workbench, over the shelf
                         // it is talking about.
@@ -139,7 +139,7 @@ class _WorkbenchState extends State<_Workbench> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: .stretch,
                       children: [
                         Expanded(
                           flex: 7,
@@ -147,7 +147,7 @@ class _WorkbenchState extends State<_Workbench> {
                             viewModel: _viewModel,
                             showShelf: false,
                             transportLeading: Row(
-                              mainAxisSize: MainAxisSize.min,
+                              mainAxisSize: .min,
                               children: [
                                 _Slots(viewModel: _viewModel, skin: skin),
                                 const SizedBox(width: 16),
@@ -212,7 +212,7 @@ class _Library extends StatelessWidget {
         child: roms.isEmpty
             ? Center(
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: .min,
                   children: [
                     const EmulatorGlyph(
                       EmulatorIcon.load,
@@ -223,7 +223,7 @@ class _Library extends StatelessWidget {
                     skin.text(
                       context,
                       'Drag and drop cartridges here',
-                      role: EmulatorTextRole.caption,
+                      role: .caption,
                     ),
                   ],
                 ),
@@ -325,10 +325,10 @@ class _LibraryCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 SizedBox(
                   width: 120,
@@ -351,8 +351,8 @@ class _LibraryCard extends StatelessWidget {
                                   ? ColoredBox(color: skin.screen(context))
                                   : RawImage(
                                       image: frame,
-                                      fit: BoxFit.fill,
-                                      filterQuality: FilterQuality.none,
+                                      fit: .fill,
+                                      filterQuality: .none,
                                     ),
                             ),
                           ),
@@ -361,25 +361,16 @@ class _LibraryCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       skin.text(context, rom.title, maxLines: 2),
                       const SizedBox(height: 4),
                       _CopyPath(rom: rom, skin: skin),
                       const SizedBox(height: 4),
-                      skin.text(
-                        context,
-                        rom.sizeLabel,
-                        role: EmulatorTextRole.caption,
-                      ),
+                      skin.text(context, rom.sizeLabel, role: .caption),
                       if (rom.note case final note?) ...[
                         const SizedBox(height: 6),
-                        skin.text(
-                          context,
-                          note,
-                          role: EmulatorTextRole.caption,
-                          maxLines: 3,
-                        ),
+                        skin.text(context, note, role: .caption, maxLines: 3),
                       ],
                       const SizedBox(height: 8),
                       Row(
@@ -435,7 +426,7 @@ class _Slots extends StatelessWidget {
     final target = rom ?? viewModel.playing;
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: .min,
       children: [
         if (showLabel)
           EmulatorGlyph(
@@ -511,7 +502,7 @@ class _CopyPathState extends State<_CopyPath> {
             child: widget.skin.text(
               context,
               widget.rom.fileName,
-              role: EmulatorTextRole.caption,
+              role: .caption,
               maxLines: 1,
             ),
           ),
@@ -540,7 +531,7 @@ class _PadTicker extends StatelessWidget {
           label: viewModel.sharesTrainingData
               ? 'sharing training data'
               : 'not sharing training data',
-          icon: EmulatorIcon.training,
+          icon: .training,
           labelled: true,
           onTap: viewModel.toggleTrainingData,
         ),
@@ -548,7 +539,7 @@ class _PadTicker extends StatelessWidget {
       trailing: [
         if (viewModel.padName case final pad?)
           Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: .min,
             children: [
               const EmulatorGlyph(
                 EmulatorIcon.controller,
@@ -556,7 +547,7 @@ class _PadTicker extends StatelessWidget {
                 color: Color(0x8ce8e8ee),
               ),
               const SizedBox(width: 6),
-              skin.text(context, pad, role: EmulatorTextRole.caption),
+              skin.text(context, pad, role: .caption),
             ],
           )
         else
@@ -565,7 +556,7 @@ class _PadTicker extends StatelessWidget {
             child: GestureDetector(
               onTap: ControllerPairing.open,
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: .min,
                 children: [
                   const EmulatorGlyph(
                     EmulatorIcon.controller,
@@ -573,11 +564,7 @@ class _PadTicker extends StatelessWidget {
                     color: Color(0x8ce8e8ee),
                   ),
                   const SizedBox(width: 6),
-                  skin.text(
-                    context,
-                    'Connect controller',
-                    role: EmulatorTextRole.caption,
-                  ),
+                  skin.text(context, 'Connect controller', role: .caption),
                 ],
               ),
             ),
@@ -587,11 +574,11 @@ class _PadTicker extends StatelessWidget {
         height: 24,
         child: Row(
           children: [
-            skin.text(context, 'Controller #1', role: EmulatorTextRole.caption),
+            skin.text(context, 'Controller #1', role: .caption),
             const SizedBox(width: 12),
             Expanded(
               child: ListView.separated(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: .horizontal,
                 reverse: true,
                 itemCount: presses.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),

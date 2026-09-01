@@ -107,17 +107,17 @@ class EmulatorSkin {
         borderRadius: BorderRadius.circular(5),
       ),
       child: switch ((icon, labelled)) {
-        (null, _) => text(context, label, role: EmulatorTextRole.caption),
+        (null, _) => text(context, label, role: .caption),
         (final icon?, false) => EmulatorGlyph(
           icon,
           color: _tone(context, hovered),
         ),
         (final icon?, true) => Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: .min,
           children: [
             EmulatorGlyph(icon, size: 13, color: _tone(context, hovered)),
             const SizedBox(width: 6),
-            text(context, label, role: EmulatorTextRole.caption),
+            text(context, label, role: .caption),
           ],
         ),
       },
@@ -144,13 +144,12 @@ class EmulatorSkin {
       borderRadius: BorderRadius.circular(6),
     ),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         if (title.isNotEmpty || leading.isNotEmpty || trailing.isNotEmpty) ...[
           Row(
             children: [
-              if (title.isNotEmpty)
-                text(context, title, role: EmulatorTextRole.heading),
+              if (title.isNotEmpty) text(context, title, role: .heading),
               ...leading,
               const Spacer(),
               ...trailing,
@@ -183,11 +182,11 @@ class EmulatorSkin {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: .start,
+        mainAxisAlignment: .spaceBetween,
         children: [
           text(context, title, maxLines: 2),
-          text(context, subtitle, role: EmulatorTextRole.caption),
+          text(context, subtitle, role: .caption),
         ],
       ),
     ),

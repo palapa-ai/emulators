@@ -79,22 +79,22 @@ class _GlyphPainter extends CustomPainter {
 
     switch (icon) {
       // Covered by the vendored Cupertino outlines above.
-      case EmulatorIcon.play:
-      case EmulatorIcon.pause:
-      case EmulatorIcon.reset:
-      case EmulatorIcon.controller:
-      case EmulatorIcon.sound:
-      case EmulatorIcon.muted:
-      case EmulatorIcon.save:
-      case EmulatorIcon.load:
-      case EmulatorIcon.delete:
-      case EmulatorIcon.copy:
-      case EmulatorIcon.check:
-      case EmulatorIcon.training:
-      case EmulatorIcon.fullscreen:
-      case EmulatorIcon.fullscreenExit:
+      case .play:
+      case .pause:
+      case .reset:
+      case .controller:
+      case .sound:
+      case .muted:
+      case .save:
+      case .load:
+      case .delete:
+      case .copy:
+      case .check:
+      case .training:
+      case .fullscreen:
+      case .fullscreenExit:
         break;
-      case EmulatorIcon.eject:
+      case .eject:
         canvas.drawPath(
           Path()
             ..moveTo(8, 3)
@@ -104,53 +104,53 @@ class _GlyphPainter extends CustomPainter {
           fill,
         );
         canvas.drawRRect(_bar(2.5, 11.5, 11, 1.8), fill);
-      case EmulatorIcon.styleRaw:
+      case .styleRaw:
         canvas.drawRRect(_bar(2.5, 4, 11, 8.5), stroke);
-      case EmulatorIcon.styleVhs:
+      case .styleVhs:
         canvas.drawRRect(_bar(2, 4.5, 12, 7.5), stroke);
         canvas.drawCircle(const Offset(5.5, 8.2), 1.5, stroke);
         canvas.drawCircle(const Offset(10.5, 8.2), 1.5, stroke);
-      case EmulatorIcon.styleTrinitron:
+      case .styleTrinitron:
         canvas.drawRRect(_bar(2.5, 4, 11, 8.5), stroke);
         for (final x in [6.0, 8.0, 10.0]) {
           canvas.drawLine(Offset(x, 5.8), Offset(x, 10.7), stroke);
         }
-      case EmulatorIcon.styleArcade:
+      case .styleArcade:
         canvas.drawLine(const Offset(4, 13), const Offset(12, 13), stroke);
         canvas.drawLine(const Offset(8, 13), const Offset(8, 7.5), stroke);
         canvas.drawCircle(const Offset(8, 5), 2.2, fill);
-      case EmulatorIcon.styleHomeTv:
+      case .styleHomeTv:
         canvas.drawRRect(_bar(2.5, 6, 11, 7), stroke);
         canvas.drawLine(const Offset(8, 6), const Offset(5, 2.5), stroke);
         canvas.drawLine(const Offset(8, 6), const Offset(11, 2.5), stroke);
-      case EmulatorIcon.styleDotMatrix:
+      case .styleDotMatrix:
         for (var y = 0; y < 3; y++) {
           for (var x = 0; x < 3; x++) {
             canvas.drawCircle(Offset(4.5 + x * 3.5, 4.5 + y * 3.5), 1, fill);
           }
         }
-      case EmulatorIcon.styleNes:
+      case .styleNes:
         canvas.drawRRect(_bar(2, 5, 12, 6.5), stroke);
         canvas.drawLine(const Offset(5, 6.7), const Offset(5, 9.8), stroke);
         canvas.drawLine(const Offset(3.5, 8.2), const Offset(6.5, 8.2), stroke);
         canvas.drawCircle(const Offset(10, 8.2), 0.9, fill);
         canvas.drawCircle(const Offset(12.2, 8.2), 0.9, fill);
-      case EmulatorIcon.styleGameBoy:
+      case .styleGameBoy:
         canvas.drawRRect(_bar(4.5, 2, 7, 12), stroke);
         canvas.drawRRect(_bar(6, 3.5, 4, 4), stroke);
         canvas.drawCircle(const Offset(9.5, 10.5), 0.9, fill);
         canvas.drawCircle(const Offset(6.5, 11.5), 0.7, fill);
-      case EmulatorIcon.styleComposite:
+      case .styleComposite:
         for (final (x, y) in [(4.0, 8.0), (8.0, 8.0), (12.0, 8.0)]) {
           canvas.drawCircle(Offset(x, y), 1.7, stroke);
           canvas.drawCircle(Offset(x, y), 0.5, fill);
         }
-      case EmulatorIcon.speedQuarter:
+      case .speedQuarter:
         _chevron(canvas, stroke, 9.5, left: true);
         _chevron(canvas, stroke, 5.5, left: true);
-      case EmulatorIcon.speedHalf:
+      case .speedHalf:
         _chevron(canvas, stroke, 7.5, left: true);
-      case EmulatorIcon.speedNormal:
+      case .speedNormal:
         canvas.drawPath(
           Path()
             ..moveTo(5.5, 4)
@@ -159,10 +159,10 @@ class _GlyphPainter extends CustomPainter {
             ..close(),
           stroke,
         );
-      case EmulatorIcon.speedDouble:
+      case .speedDouble:
         _chevron(canvas, stroke, 4.5);
         _chevron(canvas, stroke, 8.5);
-      case EmulatorIcon.speedQuad:
+      case .speedQuad:
         _chevron(canvas, stroke, 3);
         _chevron(canvas, stroke, 6.8);
         _chevron(canvas, stroke, 10.6);

@@ -1,4 +1,4 @@
-import 'package:agentic_emulator/emulators.dart';
+import 'package:emulator/emulator.dart';
 import 'package:flutter/widgets.dart';
 
 /// The agent surface, exercised by hand: every call the assistant may make,
@@ -41,19 +41,17 @@ class _ApiPanelState extends State<ApiPanel> {
 
     return CollapsingPanel(
       title: 'API',
-      trailing: [
-        skin.text(context, 'palapa.calls', role: EmulatorTextRole.caption),
-      ],
+      trailing: [skin.text(context, 'palapa.calls', role: .caption)],
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           for (final entry in EmulatorAgent.api.entries) ...[
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       Text(
                         entry.key,
@@ -66,7 +64,7 @@ class _ApiPanelState extends State<ApiPanel> {
                       skin.text(
                         context,
                         _results[entry.key] ?? entry.value,
-                        role: EmulatorTextRole.caption,
+                        role: .caption,
                         maxLines: 2,
                       ),
                     ],

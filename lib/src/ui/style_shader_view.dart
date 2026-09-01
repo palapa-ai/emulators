@@ -33,8 +33,8 @@ class _StyleShaderViewState extends State<StyleShaderView>
   double _seconds = 0;
 
   String get _asset => widget.style.shader
-      ? 'packages/agentic_emulator/shaders/vhs.frag'
-      : 'packages/agentic_emulator/shaders/crt.frag';
+      ? 'packages/emulator/shaders/vhs.frag'
+      : 'packages/emulator/shaders/crt.frag';
 
   @override
   void initState() {
@@ -93,7 +93,7 @@ class _StyleShaderViewState extends State<StyleShaderView>
   Widget build(BuildContext context) {
     final shader = _shader;
     if (shader == null || _shaderAsset != _asset) {
-      return RawImage(image: widget.frame, fit: BoxFit.contain);
+      return RawImage(image: widget.frame, fit: .contain);
     }
 
     return CustomPaint(
