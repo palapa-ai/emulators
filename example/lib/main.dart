@@ -80,9 +80,39 @@ class _WorkbenchState extends State<_Workbench> {
     super.dispose();
   }
 
+  Widget _screen(BuildContext context, EmulatorSkin skin) => EmulatorScreen(
+    viewModel: _viewModel,
+    showShelf: false,
+    transportLeading: Row(
+      mainAxisSize: .min,
+      children: [
+        _Slots(viewModel: _viewModel, skin: skin),
+        const SizedBox(width: 16),
+        _Slots(viewModel: _viewModel, skin: skin, saving: false),
+      ],
+    ),
+    transportTrailing: skin.button(
+      context,
+      label: _showApi ? 'Assistant' : 'API',
+      onTap: () => setState(() => _showApi = !_showApi),
+    ),
+    // The package hides its own chrome; the window still has to be told to
+    // fill the display.
+    onFullscreen: (on) => _drop.invokeMethod('fullscreen', on),
+  );
+
   @override
   Widget build(BuildContext context) {
     const skin = EmulatorSkin();
+
+    // The package can hide its own chrome, but it cannot climb out of the box
+    // the workbench lays it in — filling the screen is the host's half.
+    if (_viewModel.fullscreen) {
+      return ColoredBox(
+        color: const Color(0xff000000),
+        child: _screen(context, skin),
+      );
+    }
 
     return ColoredBox(
       color: skin.background(context),
@@ -141,34 +171,7 @@ class _WorkbenchState extends State<_Workbench> {
                     child: Column(
                       crossAxisAlignment: .stretch,
                       children: [
-                        Expanded(
-                          flex: 7,
-                          child: EmulatorScreen(
-                            viewModel: _viewModel,
-                            showShelf: false,
-                            transportLeading: Row(
-                              mainAxisSize: .min,
-                              children: [
-                                _Slots(viewModel: _viewModel, skin: skin),
-                                const SizedBox(width: 16),
-                                _Slots(
-                                  viewModel: _viewModel,
-                                  skin: skin,
-                                  saving: false,
-                                ),
-                              ],
-                            ),
-                            transportTrailing: skin.button(
-                              context,
-                              label: _showApi ? 'Assistant' : 'API',
-                              onTap: () => setState(() => _showApi = !_showApi),
-                            ),
-                            // The package hides its own chrome; the window
-                            // still has to be told to fill the display.
-                            onFullscreen: (on) =>
-                                _drop.invokeMethod('fullscreen', on),
-                          ),
-                        ),
+                        Expanded(flex: 7, child: _screen(context, skin)),
                         const SizedBox(height: 12),
                         _PadTicker(viewModel: _viewModel, skin: skin),
                         const SizedBox(height: 12),
@@ -365,7 +368,12 @@ class _LibraryCard extends StatelessWidget {
                     children: [
                       skin.text(context, rom.title, maxLines: 2),
                       const SizedBox(height: 4),
-                      _CopyPath(rom: rom, skin: skin),
+                      skin.text(
+                        context,
+                        rom.fileName,
+                        role: .caption,
+                        maxLines: 1,
+                      ),
                       const SizedBox(height: 4),
                       skin.text(context, rom.sizeLabel, role: .caption),
                       if (rom.note case final note?) ...[
@@ -453,62 +461,6 @@ class _Slots extends StatelessWidget {
         ],
       ],
     );
-  }
-}
-
-class _CopyPath extends StatefulWidget {
-  const _CopyPath({required this.rom, required this.skin});
-
-  final RomFile rom;
-  final EmulatorSkin skin;
-
-  @override
-  State<_CopyPath> createState() => _CopyPathState();
-}
-
-class _CopyPathState extends State<_CopyPath> {
-  Timer? _confirm;
-  bool _copied = false;
-
-  @override
-  void dispose() {
-    _confirm?.cancel();
-    super.dispose();
-  }
-
-  void _copy() {
-    Clipboard.setData(ClipboardData(text: widget.rom.path));
-    setState(() => _copied = true);
-    _confirm?.cancel();
-    _confirm = Timer(
-      const Duration(seconds: 2),
-      () => mounted ? setState(() => _copied = false) : null,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _copy,
-      child: Row(
-        children: [
-          EmulatorGlyph(
-            _copied ? EmulatorIcon.check : EmulatorIcon.copy,
-            size: 13,
-            color: _copied ? const Color(0xff7fd4a8) : const Color(0x8ce8e8ee),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: widget.skin.text(
-              context,
-              widget.rom.fileName,
-              role: .caption,
-              maxLines: 1,
-            ),
-          ),
-        ],
-      ),
-    ).clickable;
   }
 }
 

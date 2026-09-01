@@ -102,12 +102,20 @@ class EmulatorSkin {
         vertical: 7,
       ),
       decoration: BoxDecoration(
-        color: hovered ? accent(context).withValues(alpha: 0.12) : null,
-        border: Border.all(color: hovered ? accent(context) : line(context)),
+        color: hovered ? const Color(0x14ffffff) : null,
+        border: Border.all(
+          color: hovered ? const Color(0x66ffffff) : line(context),
+        ),
         borderRadius: BorderRadius.circular(5),
       ),
       child: switch ((icon, labelled)) {
-        (null, _) => text(context, label, role: .caption),
+        (null, _) => Text(
+          label,
+          style: textStyle(
+            context,
+            EmulatorTextRole.caption,
+          ).copyWith(color: _tone(context, hovered)),
+        ),
         (final icon?, false) => EmulatorGlyph(
           icon,
           color: _tone(context, hovered),
@@ -117,7 +125,13 @@ class EmulatorSkin {
           children: [
             EmulatorGlyph(icon, size: 13, color: _tone(context, hovered)),
             const SizedBox(width: 6),
-            text(context, label, role: .caption),
+            Text(
+              label,
+              style: textStyle(
+                context,
+                EmulatorTextRole.caption,
+              ).copyWith(color: _tone(context, hovered)),
+            ),
           ],
         ),
       },
@@ -125,7 +139,7 @@ class EmulatorSkin {
   );
 
   Color? _tone(BuildContext context, bool hovered) => hovered
-      ? accent(context)
+      ? const Color(0xffe8e8ee)
       : textStyle(context, EmulatorTextRole.caption).color;
 
   /// A titled region. The default is a plain bordered box; hosts with a
