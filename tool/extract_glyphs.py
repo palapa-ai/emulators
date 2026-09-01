@@ -5,6 +5,7 @@ from fontTools.pens.recordingPen import RecordingPen
 
 ICONS = {
     "reset": 0xF21C,
+    "training": 0xF818,
     "fullscreen": 0xF386,
     "fullscreenExit": 0xF37D,
     "check": 0xF3FD,

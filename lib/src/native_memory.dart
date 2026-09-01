@@ -6,8 +6,10 @@ import 'dart:ffi';
 final DynamicLibrary _libc = DynamicLibrary.process();
 
 final Pointer<Void> Function(int, int) _calloc = _libc
-    .lookupFunction<Pointer<Void> Function(IntPtr, IntPtr),
-        Pointer<Void> Function(int, int)>('calloc');
+    .lookupFunction<
+      Pointer<Void> Function(IntPtr, IntPtr),
+      Pointer<Void> Function(int, int)
+    >('calloc');
 
 final void Function(Pointer<Void>) _free = _libc
     .lookupFunction<Void Function(Pointer<Void>), void Function(Pointer<Void>)>(

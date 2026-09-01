@@ -1,4 +1,4 @@
-import 'package:emulators/emulators.dart';
+import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -58,10 +58,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
 
     return CollapsingPanel(
       title: 'Assistant',
-      trailing: [
-        if (_busy)
-          skin.text(context, 'thinking…', role: EmulatorTextRole.caption),
-      ],
+      trailing: [if (_busy) skin.text(context, 'thinking…', role: .caption)],
       // The panel is short and the form is not — it scrolls rather than
       // overflows, and the scroll is what tucks the title away.
       child: ListView(
@@ -92,7 +89,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
               for (final example in const [
                 'make chun li fat',
                 'frame generate 60fps',
-                'replace yoshi with wario snes kart',
+                'replace yoshi with wario',
               ])
                 skin.button(
                   context,
@@ -106,7 +103,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
           ),
           if (_answer.isNotEmpty) ...[
             const SizedBox(height: 8),
-            skin.text(context, _answer, role: EmulatorTextRole.caption),
+            skin.text(context, _answer, role: .caption),
           ],
         ],
       ),

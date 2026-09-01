@@ -158,8 +158,8 @@ class EmulatorViewModel extends ChangeNotifier {
     _sharesTrainingData = !_sharesTrainingData;
     session.log(
       _sharesTrainingData
-          ? 'share training data'
-          : 'do not share training data',
+          ? 'sharing training data'
+          : 'not sharing training data',
     );
     notifyListeners();
   }

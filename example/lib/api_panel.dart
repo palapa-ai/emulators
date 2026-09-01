@@ -1,4 +1,4 @@
-import 'package:emulators/emulators.dart';
+import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/widgets.dart';
 
 /// The agent surface, exercised by hand: every call the assistant may make,
@@ -38,52 +38,88 @@ class _ApiPanelState extends State<ApiPanel> {
   @override
   Widget build(BuildContext context) {
     final skin = widget.skin;
+    final names = EmulatorAgent.api.keys.toList();
 
     return CollapsingPanel(
       title: 'API',
-      trailing: [
-        skin.text(context, 'palapa.calls', role: EmulatorTextRole.caption),
-      ],
-      child: ListView(
+      trailing: [skin.text(context, 'palapa.calls', role: .caption)],
+      child: ListView.separated(
         padding: EdgeInsets.zero,
-        children: [
-          for (final entry in EmulatorAgent.api.entries) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.key,
-                        style: TextStyle(
-                          fontFamily: 'Menlo',
-                          fontSize: 11,
-                          color: skin.accent(context),
-                        ),
-                      ),
-                      skin.text(
-                        context,
-                        _results[entry.key] ?? entry.value,
-                        role: EmulatorTextRole.caption,
-                        maxLines: 2,
-                      ),
-                    ],
+        itemCount: names.length,
+        separatorBuilder: (_, _) => Container(
+          height: 1,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          color: skin.line(context),
+        ),
+        itemBuilder: (context, i) => _Call(
+          skin: skin,
+          name: names[i],
+          description: EmulatorAgent.api[names[i]] ?? '',
+          // What came back stands under the call rather than in place of
+          // what the call is for.
+          result: _results[names[i]],
+          onTry: () => _try(names[i]),
+        ),
+      ),
+    );
+  }
+}
+
+class _Call extends StatelessWidget {
+  const _Call({
+    required this.skin,
+    required this.name,
+    required this.description,
+    required this.result,
+    required this.onTry,
+  });
+
+  final EmulatorSkin skin;
+  final String name;
+  final String description;
+  final String? result;
+  final VoidCallback onTry;
+
+  @override
+  Widget build(BuildContext context) {
+    const mono = TextStyle(fontFamily: 'Menlo', fontSize: 11, height: 1.45);
+
+    return Row(
+      crossAxisAlignment: .start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: .start,
+            children: [
+              Text(name, style: mono.copyWith(color: skin.accent(context))),
+              const SizedBox(height: 2),
+              skin.text(context, description, role: .caption, maxLines: 2),
+              if (result case final result?) ...[
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x14ffffff),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    result.isEmpty ? 'done' : result,
+                    style: mono.copyWith(color: const Color(0xffe8e8ee)),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 8),
-                skin.button(
-                  context,
-                  label: 'Try',
-                  onTap: () => _try(entry.key),
-                ),
               ],
-            ),
-            const SizedBox(height: 8),
-          ],
-        ],
-      ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        skin.button(context, label: 'Try', onTap: onTry),
+      ],
     );
   }
 }

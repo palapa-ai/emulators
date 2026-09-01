@@ -285,18 +285,20 @@ class _Stage extends StatelessWidget {
           onSecondaryTap: () => viewModel.cycleSpeed(reverse: true),
         ),
         const SizedBox(width: 8),
-        skin.button(
-          context,
-          label: 'Reset',
-          icon: .reset,
-          onTap: viewModel.reset,
-        ),
-        const SizedBox(width: 8),
+        // Beside the speed it governs: at 1x that button is a play triangle,
+        // and the two reading as a pair is the point.
         skin.button(
           context,
           label: viewModel.isPaused ? 'Resume' : 'Pause',
           icon: viewModel.isPaused ? .play : .pause,
           onTap: viewModel.togglePause,
+        ),
+        const SizedBox(width: 8),
+        skin.button(
+          context,
+          label: 'Reset',
+          icon: .reset,
+          onTap: viewModel.reset,
         ),
         if (transportTrailing != null) ...[
           const SizedBox(width: 8),

@@ -127,5 +127,4 @@ enum DisplayStyle {
 
   DisplayStyle get previous =>
       values[(index - 1 + values.length) % values.length];
-
 }

@@ -34,7 +34,8 @@ class EmulatorAgent {
 
   /// The surface, by name — what an assistant is told it may ask for.
   static const api = {
-    'peek': 'read work RAM — the whole of it unless [offset] and [length] narrow it',
+    'peek':
+        'read work RAM — the whole of it unless [offset] and [length] narrow it',
     'poke': 'write [bytes] into work RAM at [offset]',
     'tap': 'press [button] for [frames] frames',
     'screenshot': 'the current picture as a PNG',

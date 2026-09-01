@@ -25,6 +25,7 @@ enum EmulatorIcon {
   load,
   copy,
   check,
+  training,
   fullscreen,
   fullscreenExit,
   styleRaw,
@@ -91,6 +92,7 @@ class EmulatorSkin {
     required VoidCallback onTap,
     EmulatorIcon? icon,
     VoidCallback? onSecondaryTap,
+    bool labelled = false,
   }) => _Hoverable(
     onTap: onTap,
     onSecondaryTap: onSecondaryTap,
@@ -100,20 +102,45 @@ class EmulatorSkin {
         vertical: 7,
       ),
       decoration: BoxDecoration(
-        color: hovered ? accent(context).withValues(alpha: 0.12) : null,
-        border: Border.all(color: hovered ? accent(context) : line(context)),
+        color: hovered ? const Color(0x14ffffff) : null,
+        border: Border.all(
+          color: hovered ? const Color(0x66ffffff) : line(context),
+        ),
         borderRadius: BorderRadius.circular(5),
       ),
-      child: icon == null
-          ? text(context, label, role: EmulatorTextRole.caption)
-          : EmulatorGlyph(
-              icon,
-              color: hovered
-                  ? accent(context)
-                  : textStyle(context, EmulatorTextRole.caption).color,
+      child: switch ((icon, labelled)) {
+        (null, _) => Text(
+          label,
+          style: textStyle(
+            context,
+            EmulatorTextRole.caption,
+          ).copyWith(color: _tone(context, hovered)),
+        ),
+        (final icon?, false) => EmulatorGlyph(
+          icon,
+          color: _tone(context, hovered),
+        ),
+        (final icon?, true) => Row(
+          mainAxisSize: .min,
+          children: [
+            EmulatorGlyph(icon, size: 13, color: _tone(context, hovered)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: textStyle(
+                context,
+                EmulatorTextRole.caption,
+              ).copyWith(color: _tone(context, hovered)),
             ),
+          ],
+        ),
+      },
     ),
   );
+
+  Color? _tone(BuildContext context, bool hovered) => hovered
+      ? const Color(0xffe8e8ee)
+      : textStyle(context, EmulatorTextRole.caption).color;
 
   /// A titled region. The default is a plain bordered box; hosts with a
   /// design system draw their own.
@@ -131,13 +158,12 @@ class EmulatorSkin {
       borderRadius: BorderRadius.circular(6),
     ),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         if (title.isNotEmpty || leading.isNotEmpty || trailing.isNotEmpty) ...[
           Row(
             children: [
-              if (title.isNotEmpty)
-                text(context, title, role: EmulatorTextRole.heading),
+              if (title.isNotEmpty) text(context, title, role: .heading),
               ...leading,
               const Spacer(),
               ...trailing,
@@ -170,11 +196,11 @@ class EmulatorSkin {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: .start,
+        mainAxisAlignment: .spaceBetween,
         children: [
           text(context, title, maxLines: 2),
-          text(context, subtitle, role: EmulatorTextRole.caption),
+          text(context, subtitle, role: .caption),
         ],
       ),
     ),

@@ -9,3 +9,6 @@ tool/.cores/
 .swiftpm/
 example/.flutter-plugins-dependencies
 example/build/
+
+# Other sessions check out worktrees in here; they are not the package.
+.claude/

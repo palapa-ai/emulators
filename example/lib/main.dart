@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:emulators/emulators.dart';
+import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -27,7 +27,7 @@ class EmulatorsExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WidgetsApp(
-      title: 'Emulator Palapa',
+      title: 'Emulator',
       color: const Color(0xff101014),
       builder: (context, _) => const _Workbench(),
     );
@@ -80,9 +80,39 @@ class _WorkbenchState extends State<_Workbench> {
     super.dispose();
   }
 
+  Widget _screen(BuildContext context, EmulatorSkin skin) => EmulatorScreen(
+    viewModel: _viewModel,
+    showShelf: false,
+    transportLeading: Row(
+      mainAxisSize: .min,
+      children: [
+        _Slots(viewModel: _viewModel, skin: skin),
+        const SizedBox(width: 16),
+        _Slots(viewModel: _viewModel, skin: skin, saving: false),
+      ],
+    ),
+    transportTrailing: skin.button(
+      context,
+      label: _showApi ? 'Assistant' : 'API',
+      onTap: () => setState(() => _showApi = !_showApi),
+    ),
+    // The package hides its own chrome; the window still has to be told to
+    // fill the display.
+    onFullscreen: (on) => _drop.invokeMethod('fullscreen', on),
+  );
+
   @override
   Widget build(BuildContext context) {
     const skin = EmulatorSkin();
+
+    // The package can hide its own chrome, but it cannot climb out of the box
+    // the workbench lays it in — filling the screen is the host's half.
+    if (_viewModel.fullscreen) {
+      return ColoredBox(
+        color: const Color(0xff000000),
+        child: _screen(context, skin),
+      );
+    }
 
     return ColoredBox(
       color: skin.background(context),
@@ -102,7 +132,7 @@ class _WorkbenchState extends State<_Workbench> {
               // an identical child skips rebuilding, so a button press does
               // not re-run every visible hex row.
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   Expanded(
                     child: _Log(viewModel: _viewModel, skin: skin),
@@ -112,12 +142,12 @@ class _WorkbenchState extends State<_Workbench> {
                 ],
               ),
               builder: (context, bottomRow) => Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   SizedBox(
                     width: 570,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: .stretch,
                       children: [
                         // The model's half of the workbench, over the shelf
                         // it is talking about.
@@ -139,36 +169,9 @@ class _WorkbenchState extends State<_Workbench> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: .stretch,
                       children: [
-                        Expanded(
-                          flex: 7,
-                          child: EmulatorScreen(
-                            viewModel: _viewModel,
-                            showShelf: false,
-                            transportLeading: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _Slots(viewModel: _viewModel, skin: skin),
-                                const SizedBox(width: 16),
-                                _Slots(
-                                  viewModel: _viewModel,
-                                  skin: skin,
-                                  saving: false,
-                                ),
-                              ],
-                            ),
-                            transportTrailing: skin.button(
-                              context,
-                              label: _showApi ? 'Assistant' : 'API',
-                              onTap: () => setState(() => _showApi = !_showApi),
-                            ),
-                            // The package hides its own chrome; the window
-                            // still has to be told to fill the display.
-                            onFullscreen: (on) =>
-                                _drop.invokeMethod('fullscreen', on),
-                          ),
-                        ),
+                        Expanded(flex: 7, child: _screen(context, skin)),
                         const SizedBox(height: 12),
                         _PadTicker(viewModel: _viewModel, skin: skin),
                         const SizedBox(height: 12),
@@ -212,7 +215,7 @@ class _Library extends StatelessWidget {
         child: roms.isEmpty
             ? Center(
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: .min,
                   children: [
                     const EmulatorGlyph(
                       EmulatorIcon.load,
@@ -223,7 +226,7 @@ class _Library extends StatelessWidget {
                     skin.text(
                       context,
                       'Drag and drop cartridges here',
-                      role: EmulatorTextRole.caption,
+                      role: .caption,
                     ),
                   ],
                 ),
@@ -325,10 +328,10 @@ class _LibraryCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 SizedBox(
                   width: 120,
@@ -351,8 +354,8 @@ class _LibraryCard extends StatelessWidget {
                                   ? ColoredBox(color: skin.screen(context))
                                   : RawImage(
                                       image: frame,
-                                      fit: BoxFit.fill,
-                                      filterQuality: FilterQuality.none,
+                                      fit: .fill,
+                                      filterQuality: .none,
                                     ),
                             ),
                           ),
@@ -361,25 +364,21 @@ class _LibraryCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       skin.text(context, rom.title, maxLines: 2),
                       const SizedBox(height: 4),
-                      _CopyPath(rom: rom, skin: skin),
-                      const SizedBox(height: 4),
                       skin.text(
                         context,
-                        rom.sizeLabel,
-                        role: EmulatorTextRole.caption,
+                        rom.fileName,
+                        role: .caption,
+                        maxLines: 1,
                       ),
+                      const SizedBox(height: 4),
+                      skin.text(context, rom.sizeLabel, role: .caption),
                       if (rom.note case final note?) ...[
                         const SizedBox(height: 6),
-                        skin.text(
-                          context,
-                          note,
-                          role: EmulatorTextRole.caption,
-                          maxLines: 3,
-                        ),
+                        skin.text(context, note, role: .caption, maxLines: 3),
                       ],
                       const SizedBox(height: 8),
                       Row(
@@ -435,7 +434,7 @@ class _Slots extends StatelessWidget {
     final target = rom ?? viewModel.playing;
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: .min,
       children: [
         if (showLabel)
           EmulatorGlyph(
@@ -465,62 +464,6 @@ class _Slots extends StatelessWidget {
   }
 }
 
-class _CopyPath extends StatefulWidget {
-  const _CopyPath({required this.rom, required this.skin});
-
-  final RomFile rom;
-  final EmulatorSkin skin;
-
-  @override
-  State<_CopyPath> createState() => _CopyPathState();
-}
-
-class _CopyPathState extends State<_CopyPath> {
-  Timer? _confirm;
-  bool _copied = false;
-
-  @override
-  void dispose() {
-    _confirm?.cancel();
-    super.dispose();
-  }
-
-  void _copy() {
-    Clipboard.setData(ClipboardData(text: widget.rom.path));
-    setState(() => _copied = true);
-    _confirm?.cancel();
-    _confirm = Timer(
-      const Duration(seconds: 2),
-      () => mounted ? setState(() => _copied = false) : null,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _copy,
-      child: Row(
-        children: [
-          EmulatorGlyph(
-            _copied ? EmulatorIcon.check : EmulatorIcon.copy,
-            size: 13,
-            color: _copied ? const Color(0xff7fd4a8) : const Color(0x8ce8e8ee),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: widget.skin.text(
-              context,
-              widget.rom.fileName,
-              role: EmulatorTextRole.caption,
-              maxLines: 1,
-            ),
-          ),
-        ],
-      ),
-    ).clickable;
-  }
-}
-
 class _PadTicker extends StatelessWidget {
   const _PadTicker({required this.viewModel, required this.skin});
 
@@ -538,23 +481,43 @@ class _PadTicker extends StatelessWidget {
         skin.button(
           context,
           label: viewModel.sharesTrainingData
-              ? 'share training data'
-              : 'do not share training data',
+              ? 'sharing training data'
+              : 'not sharing training data',
+          icon: .training,
+          labelled: true,
           onTap: viewModel.toggleTrainingData,
         ),
       ],
       trailing: [
         if (viewModel.padName case final pad?)
-          skin.text(context, pad, role: EmulatorTextRole.caption)
+          Row(
+            mainAxisSize: .min,
+            children: [
+              const EmulatorGlyph(
+                EmulatorIcon.controller,
+                size: 13,
+                color: Color(0x8ce8e8ee),
+              ),
+              const SizedBox(width: 6),
+              skin.text(context, pad, role: .caption),
+            ],
+          )
         else
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: ControllerPairing.open,
-              child: skin.text(
-                context,
-                'Connect controller',
-                role: EmulatorTextRole.caption,
+              child: Row(
+                mainAxisSize: .min,
+                children: [
+                  const EmulatorGlyph(
+                    EmulatorIcon.controller,
+                    size: 13,
+                    color: Color(0x8ce8e8ee),
+                  ),
+                  const SizedBox(width: 6),
+                  skin.text(context, 'Connect controller', role: .caption),
+                ],
               ),
             ),
           ),
@@ -563,11 +526,11 @@ class _PadTicker extends StatelessWidget {
         height: 24,
         child: Row(
           children: [
-            skin.text(context, 'Controller #1', role: EmulatorTextRole.caption),
+            skin.text(context, 'Controller #1', role: .caption),
             const SizedBox(width: 12),
             Expanded(
               child: ListView.separated(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: .horizontal,
                 reverse: true,
                 itemCount: presses.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),

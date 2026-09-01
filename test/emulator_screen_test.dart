@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:emulators/emulators.dart';
+import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -38,7 +38,6 @@ void main() {
     Directory('${temp.path}${Platform.pathSeparator}roms')
       ..createSync(recursive: true)
       ..childFile('Star Fox (U) (V1.2) [!].smc').writeAsBytesSync([0, 1, 2]);
-
 
     await tester.pumpWidget(_wrap(EmulatorScreen(libraryRoot: temp.path)));
     await tester.pumpAndSettle();
