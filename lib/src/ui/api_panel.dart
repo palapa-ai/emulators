@@ -1,13 +1,17 @@
-import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/widgets.dart';
+
+import '../emulator_agent.dart';
+import '../emulator_assistant.dart';
+import 'collapsing_panel.dart';
+import 'emulator_skin.dart';
+import 'emulator_view_model.dart';
 
 /// The agent surface, exercised by hand: every call the assistant may make,
 /// each with a live Try against the running game.
 class ApiPanel extends StatefulWidget {
-  const ApiPanel({required this.viewModel, required this.skin, super.key});
+  const ApiPanel({required this.viewModel, super.key});
 
   final EmulatorViewModel viewModel;
-  final EmulatorSkin skin;
 
   @override
   State<ApiPanel> createState() => _ApiPanelState();
@@ -37,7 +41,7 @@ class _ApiPanelState extends State<ApiPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final skin = widget.skin;
+    final skin = EmulatorTheme.of(context);
     final names = EmulatorAgent.api.keys.toList();
 
     return CollapsingPanel(
@@ -82,7 +86,9 @@ class _Call extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const mono = TextStyle(fontFamily: 'Menlo', fontSize: 11, height: 1.45);
+    final mono = skin
+        .textStyle(context, EmulatorTextRole.caption)
+        .copyWith(fontFamily: 'Menlo', height: 1.45);
 
     return Row(
       crossAxisAlignment: .start,
@@ -103,12 +109,14 @@ class _Call extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0x14ffffff),
+                    color: skin.line(context).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     result.isEmpty ? 'done' : result,
-                    style: mono.copyWith(color: const Color(0xffe8e8ee)),
+                    style: mono.copyWith(
+                      color: skin.textStyle(context, .body).color,
+                    ),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),

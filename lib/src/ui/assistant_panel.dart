@@ -1,16 +1,16 @@
-import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../emulator_agent.dart';
+import '../emulator_assistant.dart';
+import 'collapsing_panel.dart';
+import 'emulator_skin.dart';
+import 'emulator_view_model.dart';
+
 class AssistantPanel extends StatefulWidget {
-  const AssistantPanel({
-    required this.viewModel,
-    required this.skin,
-    super.key,
-  });
+  const AssistantPanel({required this.viewModel, super.key});
 
   final EmulatorViewModel viewModel;
-  final EmulatorSkin skin;
 
   @override
   State<AssistantPanel> createState() => _AssistantPanelState();
@@ -54,7 +54,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final skin = widget.skin;
+    final skin = EmulatorTheme.of(context);
 
     return CollapsingPanel(
       title: 'Assistant',
@@ -157,11 +157,13 @@ class _FieldState extends State<_Field> {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(
-      fontFamily: 'Menlo',
-      fontSize: 11,
-      color: Color(0xffe8e8ee),
-    );
+    // The host's own body text, in a fixed-width face: a key and a URL are
+    // read character by character.
+    final skin = EmulatorTheme.of(context);
+    final ink = skin.textStyle(context, EmulatorTextRole.body).color;
+    final style = skin
+        .textStyle(context, EmulatorTextRole.caption)
+        .copyWith(color: ink, fontFamily: 'Menlo');
 
     return GestureDetector(
       onTap: _focus.requestFocus,
@@ -169,7 +171,7 @@ class _FieldState extends State<_Field> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0x33ffffff)),
+          border: Border.all(color: skin.line(context)),
           borderRadius: BorderRadius.circular(4),
         ),
         child: Stack(
@@ -177,15 +179,17 @@ class _FieldState extends State<_Field> {
             if (widget.controller.text.isEmpty)
               Text(
                 widget.hint,
-                style: style.copyWith(color: const Color(0x44e8e8ee)),
+                style: skin
+                    .textStyle(context, EmulatorTextRole.caption)
+                    .copyWith(fontFamily: 'Menlo'),
               ),
             EditableText(
               controller: widget.controller,
               focusNode: _focus,
               style: style,
-              cursorColor: const Color(0xff7fd4a8),
-              backgroundCursorColor: const Color(0xff101014),
-              selectionColor: const Color(0x337fd4a8),
+              cursorColor: skin.accent(context),
+              backgroundCursorColor: skin.background(context),
+              selectionColor: skin.accent(context).withValues(alpha: 0.2),
               obscureText: widget.obscure,
               onChanged: (_) => setState(() {}),
               onSubmitted: widget.onSubmitted,

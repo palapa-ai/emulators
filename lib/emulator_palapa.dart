@@ -12,6 +12,8 @@ export 'src/pad_element.dart';
 export 'src/rom_file.dart';
 export 'src/rom_library.dart';
 export 'src/rom_notes.dart';
+export 'src/ui/api_panel.dart';
+export 'src/ui/assistant_panel.dart';
 export 'src/ui/collapsing_panel.dart';
 export 'src/ui/emulator_glyph.dart';
 export 'src/ui/emulator_icons.dart';

@@ -6,9 +6,6 @@ import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'api_panel.dart';
-import 'assistant_panel.dart';
-
 void main() => runApp(const EmulatorsExample());
 
 String get _defaultCore =>
@@ -153,11 +150,8 @@ class _WorkbenchState extends State<_Workbench> {
                         // it is talking about.
                         Expanded(
                           child: _showApi
-                              ? ApiPanel(viewModel: _viewModel, skin: skin)
-                              : AssistantPanel(
-                                  viewModel: _viewModel,
-                                  skin: skin,
-                                ),
+                              ? ApiPanel(viewModel: _viewModel)
+                              : AssistantPanel(viewModel: _viewModel),
                         ),
                         const SizedBox(height: 12),
                         Expanded(
