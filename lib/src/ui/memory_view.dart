@@ -85,7 +85,9 @@ class _MemoryViewState extends State<MemoryView> {
                 final wide = constraints.maxWidth >= charWidth * 74;
 
                 return ListView.builder(
-                  itemExtent: wide ? 18 : 34,
+                  // Rows carry a text line only when they have text, so the
+                  // narrow form cannot be pinned to one height.
+                  itemExtent: wide ? 18 : null,
                   itemCount: (ram.length / _bytesPerRow).ceil(),
                   itemBuilder: (context, row) => _Row(
                     skin: skin,
@@ -154,6 +156,9 @@ class _Row extends StatelessWidget {
       text: '${offset.toRadixString(16).padLeft(6, '0')}  ',
     );
 
+    // A row of zeros spells nothing; a line of dots under it is noise.
+    final readable = ascii.toString().replaceAll('.', '').isNotEmpty;
+
     if (wide) {
       return Text.rich(
         TextSpan(
@@ -161,7 +166,7 @@ class _Row extends StatelessWidget {
           children: [
             label,
             ...hex,
-            TextSpan(text: ' $ascii'),
+            if (readable) TextSpan(text: ' $ascii'),
           ],
         ),
         maxLines: 1,
@@ -180,12 +185,13 @@ class _Row extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.clip,
         ),
-        Text(
-          '        ↳ $ascii',
-          style: base.copyWith(color: quiet),
-          maxLines: 1,
-          overflow: TextOverflow.clip,
-        ),
+        if (readable)
+          Text(
+            '        ↳ $ascii',
+            style: base.copyWith(color: quiet),
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+          ),
       ],
     );
   }
