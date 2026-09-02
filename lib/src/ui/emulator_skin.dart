@@ -183,24 +183,41 @@ class EmulatorSkin {
     required String title,
     required String subtitle,
     required bool playing,
+    required Widget preview,
     required VoidCallback onTap,
     required VoidCallback onRemove,
   }) => GestureDetector(
     onTap: onTap,
-    onLongPress: onRemove,
     child: Container(
-      width: 168,
+      width: 200,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         border: Border.all(color: playing ? accent(context) : line(context)),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: .start,
-        mainAxisAlignment: .spaceBetween,
         children: [
-          text(context, title, maxLines: 2),
-          text(context, subtitle, role: .caption),
+          SizedBox(width: 48, child: preview),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: .start,
+              mainAxisAlignment: .spaceBetween,
+              children: [
+                text(context, title, maxLines: 2),
+                text(context, subtitle, role: .caption),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: onRemove,
+            child: const EmulatorGlyph(
+              EmulatorIcon.delete,
+              size: 13,
+              color: Color(0xffe05a5a),
+            ),
+          ).clickable,
         ],
       ),
     ),

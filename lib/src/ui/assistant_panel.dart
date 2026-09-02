@@ -1,12 +1,23 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import '../emulator_agent.dart';
 import '../emulator_assistant.dart';
 import 'collapsing_panel.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 
+/// One turn of the conversation.
+class _Turn {
+  const _Turn({required this.mine, required this.text});
+
+  final bool mine;
+  final String text;
+}
+
+/// A chat with something that can see the game and reach into it.
+///
+/// The name is the point: a second controller was always how someone who
+/// knew the game better got you past the bit you were stuck on.
 class AssistantPanel extends StatefulWidget {
   const AssistantPanel({required this.viewModel, super.key});
 
@@ -22,31 +33,47 @@ class _AssistantPanelState extends State<AssistantPanel> {
   final _url = TextEditingController();
   final _key = TextEditingController();
   final _question = TextEditingController();
-  String _answer = '';
+  final _scroll = ScrollController();
+
+  final _turns = <_Turn>[];
   bool _busy = false;
+
+  /// A host that brought its own model needs no endpoint typed at it.
+  bool get _needsEndpoint => widget.viewModel.assistant == null;
 
   @override
   void dispose() {
     _url.dispose();
     _key.dispose();
     _question.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _ask(String question) async {
-    if (question.isEmpty || _url.text.isEmpty || _busy) return;
+  Future<void> _send(String question) async {
+    if (question.isEmpty || _busy) return;
+    if (_needsEndpoint && _url.text.isEmpty) return;
 
-    widget.viewModel.assistant = HttpAssistant(
-      url: _url.text,
-      apiKey: _key.text,
-    );
+    if (_needsEndpoint) {
+      widget.viewModel.assistant = HttpAssistant(
+        url: _url.text,
+        apiKey: _key.text,
+      );
+    }
 
-    setState(() => _busy = true);
+    _question.clear();
+    setState(() {
+      _turns.add(_Turn(mine: true, text: question));
+      _busy = true;
+    });
+
     try {
       final answer = await widget.viewModel.askAssistant(question);
-      if (mounted) setState(() => _answer = answer ?? '');
+      if (mounted) {
+        setState(() => _turns.add(_Turn(mine: false, text: answer ?? '')));
+      }
     } on Object catch (e) {
-      if (mounted) setState(() => _answer = '$e');
+      if (mounted) setState(() => _turns.add(_Turn(mine: false, text: '$e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -57,54 +84,54 @@ class _AssistantPanelState extends State<AssistantPanel> {
     final skin = EmulatorTheme.of(context);
 
     return CollapsingPanel(
-      title: 'Assistant',
+      title: 'Player Two',
       trailing: [if (_busy) skin.text(context, 'thinking…', role: .caption)],
-      // The panel is short and the form is not — it scrolls rather than
-      // overflows, and the scroll is what tucks the title away.
-      child: ListView(
-        padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: .stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _Field(hint: 'https://api…/v1', controller: _url),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _Field(hint: 'API key', controller: _key, obscure: true),
-              ),
-            ],
+          if (_needsEndpoint) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _Field(hint: 'https://api…/v1', controller: _url),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _Field(
+                    hint: 'API key',
+                    controller: _key,
+                    obscure: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+          Expanded(
+            child: ListView.builder(
+              controller: _scroll,
+              reverse: true,
+              padding: EdgeInsets.zero,
+              itemCount: _turns.length,
+              itemBuilder: (context, i) {
+                final turn = _turns[_turns.length - 1 - i];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: skin.text(
+                    context,
+                    turn.mine ? '> ${turn.text}' : turn.text,
+                    role: turn.mine ? .body : .caption,
+                  ),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 6),
           _Field(
             hint: 'Ask about the game…',
             controller: _question,
-            onSubmitted: _ask,
+            onSubmitted: _send,
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final example in const [
-                'make chun li fat',
-                'frame generate 60fps',
-                'replace yoshi with wario',
-              ])
-                skin.button(
-                  context,
-                  label: example,
-                  onTap: () {
-                    _question.text = example;
-                    _ask(example);
-                  },
-                ),
-            ],
-          ),
-          if (_answer.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            skin.text(context, _answer, role: .caption),
-          ],
         ],
       ),
     );

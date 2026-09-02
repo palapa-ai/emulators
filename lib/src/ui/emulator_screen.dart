@@ -400,6 +400,32 @@ class _Idle extends StatelessWidget {
   }
 }
 
+/// A cartridge's own picture, running or parked. Watched per card so one
+/// frame repaints one thumbnail instead of the whole shelf.
+class _Preview extends StatelessWidget {
+  const _Preview({required this.session});
+
+  final EmulatorSession? session;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = this.session;
+    if (session == null) return const SizedBox.shrink();
+
+    return RepaintBoundary(
+      child: ValueListenableBuilder<ui.Image?>(
+        valueListenable: session.frames,
+        builder: (context, frame, _) => frame == null
+            ? const SizedBox.shrink()
+            : AspectRatio(
+                aspectRatio: frame.width / frame.height,
+                child: RawImage(image: frame, fit: .fill, filterQuality: .none),
+              ),
+      ),
+    );
+  }
+}
+
 class _Shelf extends StatelessWidget {
   const _Shelf({required this.viewModel, required this.skin});
 
@@ -429,6 +455,7 @@ class _Shelf extends StatelessWidget {
                   title: roms[i].title,
                   subtitle: roms[i].sizeLabel,
                   playing: roms[i] == viewModel.playing,
+                  preview: _Preview(session: viewModel.sessionFor(roms[i])),
                   onTap: () => viewModel.play(roms[i]),
                   onRemove: () => viewModel.remove(roms[i]),
                 ),
