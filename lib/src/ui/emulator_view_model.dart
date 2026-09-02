@@ -137,7 +137,7 @@ class EmulatorViewModel extends ChangeNotifier {
   bool _autoPlayed = false;
 
   RomLibrary _library;
-  final CoreLibrary _cores;
+  CoreLibrary _cores;
 
   List<RomFile> _roms = const [];
   List<RomFile> get roms => _roms;
@@ -255,6 +255,14 @@ class EmulatorViewModel extends ChangeNotifier {
   Future<void> useRomLibrary(String rootPath) async {
     _library = RomLibrary(rootPath: rootPath);
     await refresh();
+  }
+
+  /// Point the core lookup at a different folder. A host keeps its cores
+  /// where it keeps its own data, which it only knows asynchronously.
+  Future<void> useCoreLibrary(String rootPath) async {
+    _cores = CoreLibrary(rootPath: rootPath);
+    if (session.corePath == null) await _findCore();
+    notifyListeners();
   }
 
   Future<void> refresh() async {
