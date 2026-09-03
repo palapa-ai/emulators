@@ -58,6 +58,23 @@ class EmulatorSkin {
   Color accent(BuildContext context) => const Color(0xff7fd4a8);
   Color line(BuildContext context) => const Color(0x33ffffff);
 
+  /// How wide a line of chat is allowed to get, in characters. Past about
+  /// seventy the eye loses its place coming back to the left margin, which is
+  /// why every chat interface lands near this number.
+  int get measure => 70;
+
+  /// [measure] in pixels, for the text the skin actually draws.
+  double measureWidth(BuildContext context) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: '0' * measure,
+        style: textStyle(context, EmulatorTextRole.body),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    return painter.width;
+  }
+
   TextStyle textStyle(BuildContext context, EmulatorTextRole role) =>
       switch (role) {
         EmulatorTextRole.heading => const TextStyle(

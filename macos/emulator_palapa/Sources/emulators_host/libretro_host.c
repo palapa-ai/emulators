@@ -2,6 +2,7 @@
 
 #include <AudioToolbox/AudioToolbox.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <libretro.h>
@@ -328,10 +329,15 @@ static void *sym(void *lib, const char *name)
    return dlsym(lib, name);
 }
 
-static void fail(char *err, size_t err_len, const char *msg)
+static void fail(char *err, size_t err_len, const char *fmt, ...)
 {
-   if (err && err_len)
-      snprintf(err, err_len, "%s", msg);
+   if (!err || !err_len)
+      return;
+
+   va_list args;
+   va_start(args, fmt);
+   vsnprintf(err, err_len, fmt, args);
+   va_end(args);
 }
 
 EmuSession *emu_open(const char *core_path, const char *rom_path,
@@ -407,7 +413,7 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    FILE *f = fopen(rom_path, "rb");
    if (!f)
    {
-      fail(err, err_len, "cannot open rom");
+      fail(err, err_len, "cannot open rom: %s (%s)", strerror(errno), rom_path);
       emu_close(s);
       return NULL;
    }

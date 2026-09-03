@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 
 import '../emulator_agent.dart';
-import '../emulator_assistant.dart';
 import 'collapsing_panel.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';

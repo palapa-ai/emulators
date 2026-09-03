@@ -84,7 +84,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
     final skin = EmulatorTheme.of(context);
 
     return CollapsingPanel(
-      title: 'Player Two',
+      title: '',
       trailing: [if (_busy) skin.text(context, 'thinking…', role: .caption)],
       child: Column(
         crossAxisAlignment: .stretch,
@@ -117,10 +117,15 @@ class _AssistantPanelState extends State<AssistantPanel> {
                 final turn = _turns[_turns.length - 1 - i];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: skin.text(
-                    context,
-                    turn.mine ? '> ${turn.text}' : turn.text,
-                    role: turn.mine ? .body : .caption,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: skin.measureWidth(context),
+                    ),
+                    child: skin.text(
+                      context,
+                      turn.mine ? '> ${turn.text}' : turn.text,
+                      role: turn.mine ? .body : .caption,
+                    ),
                   ),
                 );
               },
