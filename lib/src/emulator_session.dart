@@ -14,8 +14,8 @@ import 'rom_file.dart';
 enum SessionStatus { idle, running, unavailable, failed }
 
 enum EmulatorSpeed {
-  quarter(0.25, '0.25x'),
-  half(0.5, '0.5x'),
+  quarter(0.25, '1/4'),
+  half(0.5, '1/2'),
   normal(1, '1x'),
   fast(2, '2x'),
   turbo(4, '4x');
