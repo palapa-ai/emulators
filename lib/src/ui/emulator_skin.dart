@@ -181,7 +181,8 @@ class EmulatorSkin {
   Widget cartridge(
     BuildContext context, {
     required String title,
-    required String subtitle,
+    required String fileName,
+    required String? note,
     required bool playing,
     required Widget preview,
     required VoidCallback onTap,
@@ -206,7 +207,9 @@ class EmulatorSkin {
               mainAxisAlignment: .spaceBetween,
               children: [
                 text(context, title, maxLines: 2),
-                text(context, subtitle, role: .caption),
+                text(context, fileName, role: .caption, maxLines: 1),
+                if (note != null)
+                  text(context, note, role: .caption, maxLines: 2),
               ],
             ),
           ),

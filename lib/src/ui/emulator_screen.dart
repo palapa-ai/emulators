@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import '../controller_pairing.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
+import '../rom_file.dart';
 import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
@@ -393,7 +394,7 @@ class _Idle extends StatelessWidget {
         'No emulator core is bundled for this platform',
       SessionStatus.failed =>
         viewModel.session.error ?? 'That cartridge would not load',
-      _ => 'Pick a cartridge below',
+      _ => 'Pick a game',
     };
 
     return Center(child: skin.text(context, message, role: .caption));
@@ -402,6 +403,40 @@ class _Idle extends StatelessWidget {
 
 /// A cartridge's own picture, running or parked. Watched per card so one
 /// frame repaints one thumbnail instead of the whole shelf.
+/// Tells the view model a cartridge is on screen for as long as its card is.
+class _PreviewScope extends StatefulWidget {
+  const _PreviewScope({
+    required this.viewModel,
+    required this.rom,
+    required this.child,
+    super.key,
+  });
+
+  final EmulatorViewModel viewModel;
+  final RomFile rom;
+  final Widget child;
+
+  @override
+  State<_PreviewScope> createState() => _PreviewScopeState();
+}
+
+class _PreviewScopeState extends State<_PreviewScope> {
+  @override
+  void initState() {
+    super.initState();
+    widget.viewModel.showPreview(widget.rom);
+  }
+
+  @override
+  void dispose() {
+    widget.viewModel.hidePreview(widget.rom);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _Preview extends StatelessWidget {
   const _Preview({required this.session});
 
@@ -439,7 +474,6 @@ class _Shelf extends StatelessWidget {
     return skin.panel(
       context,
       title: 'Collection',
-      trailing: [skin.text(context, '${roms.length}', role: .caption)],
       child: SizedBox(
         height: 104,
         child: roms.isEmpty
@@ -450,14 +484,22 @@ class _Shelf extends StatelessWidget {
                 scrollDirection: .horizontal,
                 itemCount: roms.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) => skin.cartridge(
-                  context,
-                  title: roms[i].title,
-                  subtitle: roms[i].sizeLabel,
-                  playing: roms[i] == viewModel.playing,
-                  preview: _Preview(session: viewModel.sessionFor(roms[i])),
-                  onTap: () => viewModel.play(roms[i]),
-                  onRemove: () => viewModel.remove(roms[i]),
+                // A card asks for its own preview as it scrolls into view;
+                // nothing emulates a cartridge nobody is looking at.
+                itemBuilder: (_, i) => _PreviewScope(
+                  key: ValueKey(roms[i].path),
+                  viewModel: viewModel,
+                  rom: roms[i],
+                  child: skin.cartridge(
+                    context,
+                    title: roms[i].title,
+                    fileName: roms[i].fileName,
+                    note: roms[i].note,
+                    playing: roms[i] == viewModel.playing,
+                    preview: _Preview(session: viewModel.sessionFor(roms[i])),
+                    onTap: () => viewModel.play(roms[i]),
+                    onRemove: () => viewModel.remove(roms[i]),
+                  ),
                 ),
               ),
       ),

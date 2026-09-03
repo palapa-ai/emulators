@@ -272,13 +272,29 @@ class EmulatorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Opening the shelf puts you back in the game you were last in, at the
+  // moment you left it — a console remembers what is in the slot.
   void _maybeAutoPlay() {
     if (!autoPlay || _autoPlayed) return;
     if (session.corePath == null || _roms.isEmpty) return;
 
     _autoPlayed = true;
-    session.play(_roms.first);
-    unawaited(_startPreviews());
+    unawaited(play(_lastPlayed ?? _roms.first));
+  }
+
+  static const _lastPlayedFile = '.last-played';
+
+  RomFile? get _lastPlayed {
+    final file = File('${_library.rootPath}/$_lastPlayedFile');
+    if (_library.rootPath == null || !file.existsSync()) return null;
+    final path = file.readAsStringSync().trim();
+    return _roms.where((r) => r.path == path).firstOrNull;
+  }
+
+  void _rememberLastPlayed(RomFile rom) {
+    final root = _library.rootPath;
+    if (root == null) return;
+    unawaited(File('$root/$_lastPlayedFile').writeAsString(rom.path));
   }
 
   Future<void> addFiles(Iterable<String> paths) async {
@@ -304,6 +320,7 @@ class EmulatorViewModel extends ChangeNotifier {
       session.log('parked ${parked.title}');
     }
     _park(_focused, _resumeSlot);
+    _rememberLastPlayed(rom);
     _focused.play(rom);
     final resumed = hasState(rom, _resumeSlot);
     await _resume(_focused, rom, _resumeSlot);
