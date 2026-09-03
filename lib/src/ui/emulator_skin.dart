@@ -26,6 +26,7 @@ enum EmulatorIcon {
   copy,
   check,
   training,
+  trainingOff,
   fullscreen,
   fullscreenExit,
   styleRaw,

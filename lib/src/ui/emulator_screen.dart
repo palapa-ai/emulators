@@ -11,9 +11,12 @@ import '../rom_file.dart';
 import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
+import 'state_slots.dart';
 import 'style_shader_view.dart';
 
-final _keyBindings = <LogicalKeyboardKey, EmulatorButton>{
+/// Which key stands for which button. Public because "what are the
+/// controls" is a question the screen has to be able to answer.
+final keyBindings = <LogicalKeyboardKey, EmulatorButton>{
   .arrowUp: .up,
   .arrowDown: .down,
   .arrowLeft: .left,
@@ -105,7 +108,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
       return .handled;
     }
 
-    final button = _keyBindings[event.logicalKey];
+    final button = keyBindings[event.logicalKey];
     if (button == null) return .ignored;
     if (event is KeyRepeatEvent) return .handled;
 
@@ -257,10 +260,8 @@ class _Stage extends StatelessWidget {
   Widget _transport(BuildContext context) {
     return Row(
       children: [
-        if (transportLeading != null) transportLeading ?? const SizedBox(),
-        const Spacer(),
-        // With no pad attached the package can still get the user to the
-        // system's pairing pane, so the affordance does not wait on a host.
+        // The pad and the slots lead: they belong to the cartridge, while
+        // everything to the right of the gap belongs to the picture.
         if (onPairController != null ||
             (viewModel.gamepadName == null && ControllerPairing.canOpen)) ...[
           skin.button(
@@ -269,8 +270,25 @@ class _Stage extends StatelessWidget {
             icon: .controller,
             onTap: onPairController ?? ControllerPairing.open,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 16),
         ],
+        if (viewModel.playing != null) ...[
+          StateSlots(viewModel: viewModel),
+          const SizedBox(width: 16),
+          StateSlots(viewModel: viewModel, saving: false),
+          const SizedBox(width: 16),
+        ],
+        if (transportLeading != null) transportLeading ?? const SizedBox(),
+        const Spacer(),
+        skin.button(
+          context,
+          label: viewModel.sharesTrainingData
+              ? 'sharing training data'
+              : 'not sharing training data',
+          icon: viewModel.sharesTrainingData ? .training : .trainingOff,
+          onTap: viewModel.toggleTrainingData,
+        ),
+        const SizedBox(width: 8),
         skin.button(
           context,
           label: viewModel.style?.label ?? 'Raw',

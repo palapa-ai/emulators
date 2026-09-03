@@ -91,6 +91,7 @@ class _GlyphPainter extends CustomPainter {
       case .copy:
       case .check:
       case .training:
+      case .trainingOff:
       case .fullscreen:
       case .fullscreenExit:
         break;
