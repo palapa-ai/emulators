@@ -164,6 +164,23 @@ class EmulatorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A console's pixels were never square — a SNES drew 256 across a screen
+  /// four units wide by three tall, so the tube stretched them. Showing the
+  /// frame at its own ratio is the faithful-to-the-file view; 4:3 is the
+  /// faithful-to-the-television one, and the one people remember.
+  bool _squarePixels = false;
+  bool get squarePixels => _squarePixels;
+
+  /// The shape to draw the picture in, whatever shape the core handed over.
+  double aspectFor(int width, int height) =>
+      _squarePixels ? width / height : 4 / 3;
+
+  void togglePixelShape() {
+    _squarePixels = !_squarePixels;
+    session.log(_squarePixels ? 'square pixels' : '4:3');
+    notifyListeners();
+  }
+
   /// The picture alone, filling the screen — the shelf, the panels and the
   /// host's own chrome all step out of the way until it is turned off.
   bool _fullscreen = false;

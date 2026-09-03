@@ -85,9 +85,10 @@ class _MemoryViewState extends State<MemoryView> {
                 final wide = constraints.maxWidth >= charWidth * 74;
 
                 return ListView.builder(
-                  // Rows carry a text line only when they have text, so the
-                  // narrow form cannot be pinned to one height.
-                  itemExtent: wide ? 18 : null,
+                  // Every row is the same height whether or not its bytes
+                  // spell anything, or the list would shift under the reader
+                  // each time a byte became printable.
+                  itemExtent: wide ? 18 : 34,
                   itemCount: (ram.length / _bytesPerRow).ceil(),
                   itemBuilder: (context, row) => _Row(
                     skin: skin,

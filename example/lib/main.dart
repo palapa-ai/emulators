@@ -80,6 +80,7 @@ class _WorkbenchState extends State<_Workbench> {
   Widget _screen(BuildContext context, EmulatorSkin skin) => EmulatorScreen(
     viewModel: _viewModel,
     showShelf: false,
+    showPixelShape: true,
     transportLeading: Row(
       mainAxisSize: .min,
       children: [

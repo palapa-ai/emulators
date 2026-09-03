@@ -42,6 +42,7 @@ class EmulatorScreen extends StatefulWidget {
     this.autoPlay = false,
     this.onPairController,
     this.showShelf = true,
+    this.showPixelShape = false,
     this.transportLeading,
     this.transportTrailing,
     this.onFullscreen,
@@ -62,6 +63,10 @@ class EmulatorScreen extends StatefulWidget {
 
   /// Hosts that give the collection its own place on screen turn this off.
   final bool showShelf;
+
+  /// Offers the pixel-shape toggle. A workbench wants to compare the two; a
+  /// host that has picked the television's shape should not ask again.
+  final bool showPixelShape;
 
   /// Shown as a button while no pad is attached — pairing is the host's
   /// business, since only it knows how this platform opens Bluetooth.
@@ -129,6 +134,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             viewModel: viewModel,
             skin: skin,
             immersive: viewModel.fullscreen,
+            showPixelShape: widget.showPixelShape,
             onFullscreen: () => _setFullscreen(!viewModel.fullscreen),
             onPairController: widget.onPairController,
             transportLeading: viewModel.fullscreen
@@ -170,6 +176,7 @@ class _Stage extends StatelessWidget {
     required this.skin,
     required this.immersive,
     required this.onFullscreen,
+    this.showPixelShape = false,
     this.onPairController,
     this.transportLeading,
     this.transportTrailing,
@@ -178,6 +185,7 @@ class _Stage extends StatelessWidget {
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
   final bool immersive;
+  final bool showPixelShape;
   final VoidCallback onFullscreen;
   final VoidCallback? onPairController;
   final Widget? transportLeading;
@@ -227,11 +235,11 @@ class _Stage extends StatelessWidget {
               child: switch ((frame, viewModel.style)) {
                 (null, _) => const SizedBox.expand(),
                 (final frame?, final style?) => AspectRatio(
-                  aspectRatio: frame.width / frame.height,
+                  aspectRatio: viewModel.aspectFor(frame.width, frame.height),
                   child: StyleShaderView(frame: frame, style: style),
                 ),
                 (final frame?, null) => AspectRatio(
-                  aspectRatio: frame.width / frame.height,
+                  aspectRatio: viewModel.aspectFor(frame.width, frame.height),
                   child: RawImage(
                     image: frame,
                     fit: .fill,
@@ -278,10 +286,17 @@ class _Stage extends StatelessWidget {
           onTap: viewModel.toggleMuted,
         ),
         const SizedBox(width: 8),
+        if (showPixelShape) ...[
+          skin.button(
+            context,
+            label: viewModel.squarePixels ? '1:1' : '4:3',
+            onTap: viewModel.togglePixelShape,
+          ),
+          const SizedBox(width: 8),
+        ],
         skin.button(
           context,
           label: viewModel.speed.label,
-          icon: viewModel.speed.icon,
           onTap: viewModel.cycleSpeed,
           onSecondaryTap: () => viewModel.cycleSpeed(reverse: true),
         ),
