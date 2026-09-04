@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -157,6 +158,7 @@ class EmulatorSession extends ChangeNotifier {
     }
 
     try {
+      _fetch(rom);
       _emulator = Emulator.open(corePath: core, romPath: rom.path);
       if (preview) {
         _emulator?.setAudioDiscard(discard: true);
@@ -175,7 +177,7 @@ class EmulatorSession extends ChangeNotifier {
       _emulator = null;
       _status = SessionStatus.failed;
       _error = '$e';
-      log('failed to load ${rom.title}');
+      log('failed to load ${rom.title}: $e');
       notifyListeners();
       return;
     }
@@ -239,6 +241,18 @@ class EmulatorSession extends ChangeNotifier {
   void pauseOnNextFrame() {
     if (_emulator == null || _paused) return;
     _pauseOnFrame = true;
+  }
+
+  /// A cartridge in a synced folder lists by name long before its bytes are
+  /// on this disk. Reading one here is what asks the system to fetch them, so
+  /// the core is never handed a file that is nothing but a name yet.
+  void _fetch(RomFile rom) {
+    final handle = File(rom.path).openSync();
+    try {
+      handle.readByteSync();
+    } finally {
+      handle.closeSync();
+    }
   }
 
   void pause() {
