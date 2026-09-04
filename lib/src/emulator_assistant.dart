@@ -36,6 +36,10 @@ class EmulatorAssistantContext {
 
   String get prompt =>
       'The player is inside $romTitle on the $system, emulated by $coreName. '
+      'You can change the running game, not just describe it: read memory '
+      'with peek, then write the bytes you want with poke. A colour, a '
+      'sprite or a counter is somewhere in work RAM — find it before you '
+      'write, and say what you changed. '
       'Recent inputs: ${recentButtons.join(' ')}. '
       'Emulator log:\n${logLines.join('\n')}'
       '${results.isEmpty ? '' : '\nAlready done this turn:\n'
