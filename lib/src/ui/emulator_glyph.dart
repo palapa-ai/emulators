@@ -95,12 +95,6 @@ class _GlyphPainter extends CustomPainter {
       case .fullscreen:
       case .fullscreenExit:
         break;
-      case .slotOne:
-        _numeral(canvas, stroke, '1');
-      case .slotTwo:
-        _numeral(canvas, stroke, '2');
-      case .slotThree:
-        _numeral(canvas, stroke, '3');
       case .eject:
         canvas.drawPath(
           Path()
@@ -176,30 +170,6 @@ class _GlyphPainter extends CustomPainter {
     }
 
     canvas.restore();
-  }
-
-  /// The numbered circle the icon set does not carry: drawn to the same
-  /// weight as the outlines beside it rather than set as ①, which arrives in
-  /// whatever the text font happens to have.
-  void _numeral(Canvas canvas, Paint stroke, String digit) {
-    canvas.drawCircle(const Offset(8, 8), 6.4, stroke);
-
-    final painter = TextPainter(
-      text: TextSpan(
-        text: digit,
-        style: TextStyle(
-          color: stroke.color,
-          fontSize: 9,
-          fontWeight: FontWeight.w500,
-          height: 1,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(
-      canvas,
-      Offset(8 - painter.width / 2, 8 - painter.height / 2),
-    );
   }
 
   void _chevron(Canvas canvas, Paint paint, double x, {bool left = false}) {

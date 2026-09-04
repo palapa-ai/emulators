@@ -83,9 +83,9 @@ class _WorkbenchState extends State<_Workbench> {
     transportLeading: Row(
       mainAxisSize: .min,
       children: [
-        _Slots(viewModel: _viewModel, skin: skin),
+        StateSlots(viewModel: _viewModel),
         const SizedBox(width: 16),
-        _Slots(viewModel: _viewModel, skin: skin, saving: false),
+        StateSlots(viewModel: _viewModel, saving: false),
       ],
     ),
     transportTrailing: skin.button(
@@ -329,12 +329,11 @@ class _LibraryCard extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: _Slots(
+                            child: StateSlots(
                               viewModel: viewModel,
-                              skin: skin,
                               rom: rom,
                               saving: false,
-                              showLabel: false,
+                              showIcon: false,
                             ),
                           ),
                           GestureDetector(
@@ -359,55 +358,6 @@ class _LibraryCard extends StatelessWidget {
   }
 }
 
-class _Slots extends StatelessWidget {
-  const _Slots({
-    required this.viewModel,
-    required this.skin,
-    this.rom,
-    this.saving = true,
-    this.showLabel = true,
-  });
-
-  final EmulatorViewModel viewModel;
-  final EmulatorSkin skin;
-  final RomFile? rom;
-  final bool saving;
-  final bool showLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final target = rom ?? viewModel.playing;
-
-    return Row(
-      mainAxisSize: .min,
-      children: [
-        if (showLabel)
-          EmulatorGlyph(
-            saving ? EmulatorIcon.save : EmulatorIcon.load,
-            size: 16,
-          ),
-        for (var slot = 1; slot <= EmulatorViewModel.slotCount; slot++) ...[
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () => saving
-                ? viewModel.saveState(slot)
-                : viewModel.loadState(slot, from: rom),
-            // A filled slot reads as available; an empty one stays quiet.
-            child: Text(
-              const ['①', '②', '③'][slot - 1],
-              style: TextStyle(
-                fontSize: 20,
-                color: target != null && viewModel.hasState(target, slot)
-                    ? skin.accent(context)
-                    : const Color(0x8ce8e8ee),
-              ),
-            ),
-          ).clickable,
-        ],
-      ],
-    );
-  }
-}
 
 class _PadTicker extends StatelessWidget {
   const _PadTicker({required this.viewModel, required this.skin});
