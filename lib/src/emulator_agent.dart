@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
+import 'emulator_assistant.dart';
 import 'emulator_button.dart';
 import 'emulator_session.dart';
 
@@ -27,6 +29,18 @@ class AgentCall {
 /// one named-call surface, so a model's reply can act as well as answer.
 /// Every call it runs lands in the session log, where the player can see
 /// exactly what the agent did.
+/// A call the model made and what came back, so the next turn can be told
+/// what it learned.
+class AgentResult {
+  const AgentResult({required this.call, required this.value});
+
+  final AgentCall call;
+  final Object? value;
+
+  @override
+  String toString() => '${call.name}(${jsonEncode(call.args)}) -> $value';
+}
+
 class EmulatorAgent {
   EmulatorAgent(this._session);
 
@@ -92,6 +106,32 @@ class EmulatorAgent {
 
   /// Runs one named call and answers with something JSON-friendly, logging
   /// what happened where the player can see it.
+  /// Ask, do what was asked, say what happened, ask again — until the model
+  /// stops asking for things.
+  ///
+  /// A single exchange cannot change anything the model has not already
+  /// memorised: it has to read the memory before it knows which byte holds
+  /// the colour it is being asked to change.
+  Future<String> converse(
+    EmulatorAssistant assistant,
+    String question,
+    EmulatorAssistantContext context, {
+    int maxTurns = 6,
+  }) async {
+    final results = <AgentResult>[];
+
+    for (var turn = 0; turn < maxTurns; turn++) {
+      final reply = await assistant.ask(question, context.after(results));
+      if (reply.calls.isEmpty) return reply.answer;
+
+      for (final call in reply.calls) {
+        results.add(AgentResult(call: call, value: await run(call)));
+      }
+    }
+
+    return 'Stopped after $maxTurns turns of tool calls.';
+  }
+
   Future<Object?> run(AgentCall call) async {
     _session.log('api ${call.name}');
     switch (call.name) {

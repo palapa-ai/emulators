@@ -191,7 +191,8 @@ class EmulatorViewModel extends ChangeNotifier {
     if (assistant == null) return null;
 
     return () async {
-      final reply = await assistant.ask(
+      return agent.converse(
+        assistant,
         question,
         EmulatorAssistantContext(
           romTitle: session.rom?.title ?? 'no cartridge',
@@ -203,10 +204,6 @@ class EmulatorViewModel extends ChangeNotifier {
           recentButtons: [for (final b in session.padLog) b.label],
         ),
       );
-      for (final call in reply.calls) {
-        await agent.run(call);
-      }
-      return reply.answer;
     }();
   }
 

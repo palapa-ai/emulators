@@ -12,6 +12,7 @@ class EmulatorAssistantContext {
     required this.coreName,
     required this.logLines,
     required this.recentButtons,
+    this.results = const [],
   });
 
   final String romTitle;
@@ -20,10 +21,25 @@ class EmulatorAssistantContext {
   final List<String> logLines;
   final List<String> recentButtons;
 
+  /// What earlier tool calls in this exchange returned.
+  final List<AgentResult> results;
+
+  EmulatorAssistantContext after(List<AgentResult> results) =>
+      EmulatorAssistantContext(
+        romTitle: romTitle,
+        system: system,
+        coreName: coreName,
+        logLines: logLines,
+        recentButtons: recentButtons,
+        results: results,
+      );
+
   String get prompt =>
       'The player is inside $romTitle on the $system, emulated by $coreName. '
       'Recent inputs: ${recentButtons.join(' ')}. '
-      'Emulator log:\n${logLines.join('\n')}';
+      'Emulator log:\n${logLines.join('\n')}'
+      '${results.isEmpty ? '' : '\nAlready done this turn:\n'
+          '${results.join('\n')}'}';
 }
 
 /// An answer, and what the model asked to do to the game alongside it.
