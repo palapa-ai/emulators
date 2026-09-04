@@ -508,7 +508,8 @@ class _Shelf extends StatelessWidget {
       context,
       title: 'Collection',
       child: SizedBox(
-        height: 104,
+        // The square, with the title standing over it.
+        height: skin.cartridgeSide + 26,
         child: roms.isEmpty
             ? Center(
                 child: skin.text(context, 'No cartridges yet', role: .caption),
@@ -526,8 +527,6 @@ class _Shelf extends StatelessWidget {
                   child: skin.cartridge(
                     context,
                     title: roms[i].title,
-                    fileName: roms[i].fileName,
-                    note: roms[i].note,
                     playing: roms[i] == viewModel.playing,
                     preview: _Preview(session: viewModel.sessionFor(roms[i])),
                     onTap: () => viewModel.play(roms[i]),

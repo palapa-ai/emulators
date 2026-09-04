@@ -196,49 +196,41 @@ class EmulatorSkin {
     ),
   );
 
+  /// How wide a cartridge stands on the shelf. Its picture is square, so
+  /// this is the picture's side too, and the title sits over it.
+  double get cartridgeSide => 96;
+
   Widget cartridge(
     BuildContext context, {
     required String title,
-    required String fileName,
-    required String? note,
     required bool playing,
     required Widget preview,
     required VoidCallback onTap,
     required VoidCallback onRemove,
   }) => GestureDetector(
     onTap: onTap,
-    child: Container(
-      width: 200,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: playing ? accent(context) : line(context)),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
+    onSecondaryTap: onRemove,
+    child: SizedBox(
+      width: cartridgeSide,
+      child: Column(
+        mainAxisSize: .min,
         crossAxisAlignment: .start,
         children: [
-          SizedBox(width: 48, child: preview),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: .start,
-              mainAxisAlignment: .spaceBetween,
-              children: [
-                text(context, title, maxLines: 2),
-                text(context, fileName, role: .caption, maxLines: 1),
-                if (note != null)
-                  text(context, note, role: .caption, maxLines: 2),
-              ],
+          text(context, title, maxLines: 1),
+          const SizedBox(height: 6),
+          Container(
+            width: cartridgeSide,
+            height: cartridgeSide,
+            decoration: BoxDecoration(
+              color: screen(context),
+              border: Border.all(
+                color: playing ? accent(context) : line(context),
+              ),
+              borderRadius: BorderRadius.circular(6),
             ),
+            clipBehavior: Clip.antiAlias,
+            child: preview,
           ),
-          GestureDetector(
-            onTap: onRemove,
-            child: const EmulatorGlyph(
-              EmulatorIcon.delete,
-              size: 13,
-              color: Color(0xffe05a5a),
-            ),
-          ).clickable,
         ],
       ),
     ),
