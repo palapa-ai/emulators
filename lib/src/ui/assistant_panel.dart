@@ -107,30 +107,44 @@ class _AssistantPanelState extends State<AssistantPanel> {
             ),
             const SizedBox(height: 6),
           ],
-          Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              reverse: true,
-              padding: EdgeInsets.zero,
-              itemCount: _turns.length,
-              itemBuilder: (context, i) {
-                final turn = _turns[_turns.length - 1 - i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: skin.measureWidth(context),
+          if (_turns.isEmpty)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: .stretch,
+                mainAxisAlignment: .end,
+                children: [
+                  for (final example in _examples) ...[
+                    _Example(text: example, onTap: () => _send(example)),
+                    const SizedBox(height: 6),
+                  ],
+                ],
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                controller: _scroll,
+                reverse: true,
+                padding: EdgeInsets.zero,
+                itemCount: _turns.length,
+                itemBuilder: (context, i) {
+                  final turn = _turns[_turns.length - 1 - i];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: skin.measureWidth(context),
+                      ),
+                      child: skin.text(
+                        context,
+                        turn.mine ? '> ${turn.text}' : turn.text,
+                        role: turn.mine ? .body : .caption,
+                      ),
                     ),
-                    child: skin.text(
-                      context,
-                      turn.mine ? '> ${turn.text}' : turn.text,
-                      role: turn.mine ? .body : .caption,
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
           const SizedBox(height: 6),
           _Field(
             hint: 'Ask about the game…',
@@ -140,6 +154,39 @@ class _AssistantPanelState extends State<AssistantPanel> {
         ],
       ),
     );
+  }
+}
+
+/// What the model is for, said as three things worth asking it — a blank
+/// chat box does not tell anyone that the game is the thing being edited.
+const _examples = [
+  'make chun li fat',
+  'frame generate to 60fps',
+  'replace yoshi with wario',
+];
+
+class _Example extends StatelessWidget {
+  const _Example({required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final skin = EmulatorTheme.of(context);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: skin.line(context)),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: skin.text(context, text, role: .caption),
+      ),
+    ).clickable;
   }
 }
 
