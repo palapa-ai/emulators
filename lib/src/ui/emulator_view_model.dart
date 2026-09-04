@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
@@ -12,6 +13,7 @@ import '../emulator_session.dart';
 import '../pad_element.dart';
 import '../rom_file.dart';
 import '../rom_library.dart';
+import '../rom_portraits.dart';
 
 /// Wires the models to the screen and holds nothing else. The shelf, the core
 /// lookup and the emulation itself live in [RomLibrary], [CoreLibrary] and
@@ -44,91 +46,50 @@ class EmulatorViewModel extends ChangeNotifier {
   EmulatorSession? sessionFor(RomFile rom) =>
       rom.path == _focused.rom?.path ? _focused : _sessions[rom.path];
 
-  bool _previewsRunning = true;
-  bool get previewsRunning => _previewsRunning;
+  RomPortraits? _portraits;
+  final _pictures = <String, ui.Image>{};
+  var _capturing = false;
 
-  Future<void> togglePreviews() async {
-    _previewsRunning ? _stopPreviews() : await _startPreviews();
-    notifyListeners();
-  }
+  /// The cartridge's own picture, once it has one.
+  ui.Image? pictureOf(RomFile rom) => _pictures[rom.path];
 
-  /// Emulating a shelf nobody is looking at is pure waste, so previews only
-  /// cover cards the host has put on screen, and never more than this many at
-  /// once — each one is a whole core with its own copy of the ROM.
-  static const maxPreviews = 8;
-
-  final _visible = <String>{};
-  var _syncQueued = false;
-
-  /// Called by a card as it scrolls into and out of the viewport. A scroll
-  /// moves many at once, so the sessions are reconciled once at the end.
-  void showPreview(RomFile rom) {
-    if (_visible.add(rom.path)) _queueSync();
-  }
-
-  void hidePreview(RomFile rom) {
-    if (_visible.remove(rom.path)) _queueSync();
-  }
-
-  void _queueSync() {
-    if (_syncQueued) return;
-    _syncQueued = true;
-    scheduleMicrotask(() async {
-      _syncQueued = false;
-      if (_previewsRunning) await _startPreviews();
-      notifyListeners();
-    });
-  }
-
-  Future<void> _startPreviews() async {
-    _previewsRunning = true;
+  /// Every cartridge without a picture is booted once, in turn, and closed.
+  /// Nothing on the shelf is emulating by the time the player sees it.
+  Future<void> _fillPictures() async {
     final core = session.corePath;
-    if (core == null) return;
+    if (core == null || _capturing) return;
 
-    final keep = _roms
-        .where((r) => _visible.contains(r.path) && r.path != _focused.rom?.path)
-        .take(maxPreviews)
-        .map((r) => r.path)
-        .toSet();
+    _capturing = true;
+    final portraits = _portraits ??= RomPortraits(corePath: core);
 
-    for (final entry in _sessions.entries.toList()) {
-      if (entry.key == _focusKey || keep.contains(entry.key)) continue;
-      _park(entry.value, _previewSlot);
-      entry.value.dispose();
-      _sessions.remove(entry.key);
-    }
+    try {
+      for (final rom in _roms) {
+        if (!portraits.has(rom)) await portraits.capture(rom);
+        final picture = await portraits.load(rom);
+        if (picture == null) continue;
 
-    final wanted = _roms
-        .where((r) => _visible.contains(r.path) && r.path != _focused.rom?.path)
-        .take(maxPreviews);
-
-    for (final rom in wanted) {
-      if (rom.path == _focused.rom?.path || _sessions.containsKey(rom.path)) {
-        continue;
+        _pictures[rom.path] = picture;
+        notifyListeners();
       }
-
-      // No global listener: each shelf card watches its own preview, so a
-      // frame repaints one thumbnail instead of the entire shelf.
-      final preview = EmulatorSession(corePath: core, preview: true)..play(rom);
-      _sessions[rom.path] = preview;
-
-      // A cartridge the player has been inside comes back to where they left
-      // it and stops there. Only the ones never played keep running, so the
-      // shelf demonstrates what is unopened instead of restarting your game.
-      final played = hasState(rom, _resumeSlot);
-      await _resume(preview, rom, played ? _resumeSlot : _previewSlot);
-      if (played) preview.pauseOnNextFrame();
+    } finally {
+      _capturing = false;
     }
   }
 
-  void _stopPreviews() {
-    _previewsRunning = false;
-    for (final entry in _sessions.entries.toList()) {
-      if (entry.key == _focusKey) continue;
-      _park(entry.value, _previewSlot);
-      entry.value.dispose();
-      _sessions.remove(entry.key);
-    }
+  /// What the player last saw, so the shelf shows where they left off rather
+  /// than the title screen they have not looked at since the first boot.
+  Future<void> _repicture(EmulatorSession from) async {
+    final rom = from.rom;
+    final frame = from.frames.value;
+    final portraits = _portraits;
+    if (rom == null || frame == null || portraits == null) return;
+
+    await portraits.save(rom, frame);
+    final picture = await portraits.load(rom);
+    if (picture == null) return;
+
+    _pictures[rom.path] = picture;
+    notifyListeners();
   }
 
   /// Start the first cartridge as soon as both it and a core are known —
@@ -285,8 +246,8 @@ class EmulatorViewModel extends ChangeNotifier {
   Future<void> refresh() async {
     _roms = await _library.load();
     _maybeAutoPlay();
-    if (_previewsRunning) await _startPreviews();
     notifyListeners();
+    unawaited(_fillPictures());
   }
 
   // Opening the shelf puts you back in the game you were last in, at the
@@ -335,6 +296,7 @@ class EmulatorViewModel extends ChangeNotifier {
     final parked = _focused.rom;
     if (parked != null && _focused.isRunning) {
       session.log('parked ${parked.title}');
+      await _repicture(_focused);
     }
     _park(_focused, _resumeSlot);
     _rememberLastPlayed(rom);
@@ -342,7 +304,6 @@ class EmulatorViewModel extends ChangeNotifier {
     final resumed = hasState(rom, _resumeSlot);
     await _resume(_focused, rom, _resumeSlot);
     if (resumed) session.log('resumed ${rom.title}');
-    if (_previewsRunning) await _startPreviews();
     notifyListeners();
   }
 
@@ -356,15 +317,12 @@ class EmulatorViewModel extends ChangeNotifier {
   /// Three slots per cartridge, kept beside it on disk.
   static const slotCount = 3;
 
-  /// Two more the shelf never shows. A preview parks in one as it scrolls
-  /// away so it carries on instead of rebooting, and the cartridge you step
-  /// away from parks in the other so clicking it puts you back where you were.
-  static const _previewSlot = 4;
+  /// One more the shelf never shows: the cartridge you step away from parks
+  /// here, so clicking it puts you back where you were.
   static const _resumeSlot = 5;
 
-  // Silent: previews park and resume constantly as the shelf scrolls, and a
-  // log that narrates them buries the player's own actions. play() speaks for
-  // the one move the player made.
+  // Silent: a park happens on every swap, and a log that narrates them buries
+  // the player's own actions. play() speaks for the one move they made.
   void _park(EmulatorSession target, int slot) {
     final rom = target.rom;
     if (rom == null || !target.isRunning) return;

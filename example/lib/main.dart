@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/services.dart';
@@ -231,16 +230,12 @@ class _Library extends StatelessWidget {
                 itemCount: roms.length,
                 itemBuilder: (context, i) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: _PreviewScope(
+                  child: _LibraryCard(
                     key: ValueKey(roms[i].path),
                     viewModel: viewModel,
+                    skin: skin,
                     rom: roms[i],
-                    child: _LibraryCard(
-                      viewModel: viewModel,
-                      skin: skin,
-                      rom: roms[i],
-                      playing: roms[i] == viewModel.playing,
-                    ),
+                    playing: roms[i] == viewModel.playing,
                   ),
                 ),
               ),
@@ -260,43 +255,9 @@ void _debounced(VoidCallback action) {
   action();
 }
 
-/// Runs a cartridge's preview for exactly as long as its card is built, so
-/// scrolling one off the shelf unloads the emulator behind it.
-class _PreviewScope extends StatefulWidget {
-  const _PreviewScope({
-    super.key,
-    required this.viewModel,
-    required this.rom,
-    required this.child,
-  });
-
-  final EmulatorViewModel viewModel;
-  final RomFile rom;
-  final Widget child;
-
-  @override
-  State<_PreviewScope> createState() => _PreviewScopeState();
-}
-
-class _PreviewScopeState extends State<_PreviewScope> {
-  @override
-  void initState() {
-    super.initState();
-    widget.viewModel.showPreview(widget.rom);
-  }
-
-  @override
-  void dispose() {
-    widget.viewModel.hidePreview(widget.rom);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
-}
-
 class _LibraryCard extends StatelessWidget {
   const _LibraryCard({
+    super.key,
     required this.viewModel,
     required this.skin,
     required this.rom,
@@ -310,7 +271,7 @@ class _LibraryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = viewModel.sessionFor(rom);
+    final picture = viewModel.pictureOf(rom);
 
     return GestureDetector(
       onTap: () => _debounced(() => viewModel.play(rom)),
@@ -330,31 +291,20 @@ class _LibraryCard extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 120,
-                  // Listening per card keeps one preview's frame from
-                  // rebuilding the whole window. The box takes the frame's
-                  // own shape, so the picture meets its edges with no bars.
-                  child: session == null
-                      ? AspectRatio(
-                          aspectRatio: 4 / 3,
-                          child: ColoredBox(color: skin.screen(context)),
-                        )
-                      : RepaintBoundary(
-                          child: ValueListenableBuilder<ui.Image?>(
-                            valueListenable: session.frames,
-                            builder: (context, frame, _) => AspectRatio(
-                              aspectRatio: frame == null
-                                  ? 4 / 3
-                                  : frame.width / frame.height,
-                              child: frame == null
-                                  ? ColoredBox(color: skin.screen(context))
-                                  : RawImage(
-                                      image: frame,
-                                      fit: .fill,
-                                      filterQuality: .none,
-                                    ),
-                            ),
+                  // The box takes the picture's own shape, so it meets the
+                  // edges with no bars.
+                  child: AspectRatio(
+                    aspectRatio: picture == null
+                        ? 4 / 3
+                        : picture.width / picture.height,
+                    child: picture == null
+                        ? ColoredBox(color: skin.screen(context))
+                        : RawImage(
+                            image: picture,
+                            fit: .fill,
+                            filterQuality: .none,
                           ),
-                        ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

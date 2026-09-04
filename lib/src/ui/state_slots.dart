@@ -25,7 +25,11 @@ class StateSlots extends StatelessWidget {
   final bool saving;
   final bool showIcon;
 
-  static const _numerals = ['①', '②', '③'];
+  static const _numerals = [
+    EmulatorIcon.slotOne,
+    EmulatorIcon.slotTwo,
+    EmulatorIcon.slotThree,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -46,14 +50,12 @@ class StateSlots extends StatelessWidget {
             onTap: () => saving
                 ? viewModel.saveState(slot)
                 : viewModel.loadState(slot, from: rom),
-            child: Text(
+            child: EmulatorGlyph(
               _numerals[slot - 1],
-              style: TextStyle(
-                fontSize: 20,
-                color: target != null && viewModel.hasState(target, slot)
-                    ? skin.accent(context)
-                    : skin.textStyle(context, EmulatorTextRole.caption).color,
-              ),
+              size: 16,
+              color: target != null && viewModel.hasState(target, slot)
+                  ? skin.accent(context)
+                  : skin.textStyle(context, EmulatorTextRole.caption).color,
             ),
           ).clickable,
         ],

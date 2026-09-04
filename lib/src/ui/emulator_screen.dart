@@ -162,7 +162,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
                 Expanded(child: stage),
                 if (widget.showShelf) ...[
                   const SizedBox(height: 16),
-                  _Shelf(viewModel: viewModel, skin: skin),
+                  EmulatorShelf(viewModel: viewModel, skin: skin),
                 ],
               ],
             ),
@@ -434,68 +434,57 @@ class _Idle extends StatelessWidget {
   }
 }
 
-/// A cartridge's own picture, running or parked. Watched per card so one
-/// frame repaints one thumbnail instead of the whole shelf.
-/// Tells the view model a cartridge is on screen for as long as its card is.
-class _PreviewScope extends StatefulWidget {
-  const _PreviewScope({
-    required this.viewModel,
-    required this.rom,
-    required this.child,
-    super.key,
-  });
+/// A cartridge's own picture: the frame it was photographed on, or the one
+/// the player is looking at when it is the game on the screen.
+class _Preview extends StatelessWidget {
+  const _Preview({required this.viewModel, required this.rom});
 
   final EmulatorViewModel viewModel;
   final RomFile rom;
-  final Widget child;
-
-  @override
-  State<_PreviewScope> createState() => _PreviewScopeState();
-}
-
-class _PreviewScopeState extends State<_PreviewScope> {
-  @override
-  void initState() {
-    super.initState();
-    widget.viewModel.showPreview(widget.rom);
-  }
-
-  @override
-  void dispose() {
-    widget.viewModel.hidePreview(widget.rom);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
-}
-
-class _Preview extends StatelessWidget {
-  const _Preview({required this.session});
-
-  final EmulatorSession? session;
 
   @override
   Widget build(BuildContext context) {
-    final session = this.session;
-    if (session == null) return const SizedBox.shrink();
+    final live = viewModel.playing == rom ? viewModel.session.frames : null;
+    if (live == null) {
+      return _Picture(viewModel: viewModel, image: viewModel.pictureOf(rom));
+    }
 
     return RepaintBoundary(
       child: ValueListenableBuilder<ui.Image?>(
-        valueListenable: session.frames,
-        builder: (context, frame, _) => frame == null
-            ? const SizedBox.shrink()
-            : AspectRatio(
-                aspectRatio: frame.width / frame.height,
-                child: RawImage(image: frame, fit: .fill, filterQuality: .none),
-              ),
+        valueListenable: live,
+        builder: (context, frame, _) => _Picture(
+          viewModel: viewModel,
+          image: frame ?? viewModel.pictureOf(rom),
+        ),
       ),
     );
   }
 }
 
-class _Shelf extends StatelessWidget {
-  const _Shelf({required this.viewModel, required this.skin});
+class _Picture extends StatelessWidget {
+  const _Picture({required this.viewModel, required this.image});
+
+  final EmulatorViewModel viewModel;
+  final ui.Image? image;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = this.image;
+    if (image == null) return const SizedBox.shrink();
+
+    // The console's shape, not the frame buffer's — its pixels are not
+    // square, so the picture is wider than the numbers say.
+    return AspectRatio(
+      aspectRatio: viewModel.aspectFor(image.width, image.height),
+      child: RawImage(image: image, fit: .fill, filterQuality: .none),
+    );
+  }
+}
+
+/// The cartridges, in a row. Public because a host with its own chrome puts
+/// the shelf in a box of its own rather than under the screen.
+class EmulatorShelf extends StatelessWidget {
+  const EmulatorShelf({required this.viewModel, required this.skin, super.key});
 
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
@@ -508,8 +497,8 @@ class _Shelf extends StatelessWidget {
       context,
       title: 'Collection',
       child: SizedBox(
-        // The square, with the title standing over it.
-        height: skin.cartridgeSide + 26,
+        // The picture, in the console's shape, plus the card's own padding.
+        height: skin.cartridgePicture * 3 / 4 + 20,
         child: roms.isEmpty
             ? Center(
                 child: skin.text(context, 'No cartridges yet', role: .caption),
@@ -520,18 +509,20 @@ class _Shelf extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
                 // A card asks for its own preview as it scrolls into view;
                 // nothing emulates a cartridge nobody is looking at.
-                itemBuilder: (_, i) => _PreviewScope(
-                  key: ValueKey(roms[i].path),
-                  viewModel: viewModel,
-                  rom: roms[i],
-                  child: skin.cartridge(
-                    context,
-                    title: roms[i].title,
-                    playing: roms[i] == viewModel.playing,
-                    preview: _Preview(session: viewModel.sessionFor(roms[i])),
-                    onTap: () => viewModel.play(roms[i]),
-                    onRemove: () => viewModel.remove(roms[i]),
+                itemBuilder: (_, i) => skin.cartridge(
+                  context,
+                  title: roms[i].title,
+                  year: roms[i].year,
+                  playing: roms[i] == viewModel.playing,
+                  preview: _Preview(viewModel: viewModel, rom: roms[i]),
+                  slots: StateSlots(
+                    viewModel: viewModel,
+                    rom: roms[i],
+                    saving: false,
+                    showIcon: false,
                   ),
+                  onTap: () => viewModel.play(roms[i]),
+                  onRemove: () => viewModel.remove(roms[i]),
                 ),
               ),
       ),

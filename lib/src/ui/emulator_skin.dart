@@ -27,6 +27,9 @@ enum EmulatorIcon {
   check,
   training,
   trainingOff,
+  slotOne,
+  slotTwo,
+  slotThree,
   fullscreen,
   fullscreenExit,
   styleRaw,
@@ -196,41 +199,61 @@ class EmulatorSkin {
     ),
   );
 
-  /// How wide a cartridge stands on the shelf. Its picture is square, so
-  /// this is the picture's side too, and the title sits over it.
-  double get cartridgeSide => 96;
+  /// How wide a cartridge stands on the shelf — its picture beside its name,
+  /// with room for the name to be a name rather than an ellipsis.
+  double get cartridgeWidth => 300;
+
+  /// The picture's width; the console's shape decides its height.
+  double get cartridgePicture => 128;
 
   Widget cartridge(
     BuildContext context, {
     required String title,
+    required int? year,
     required bool playing,
     required Widget preview,
+    required Widget slots,
     required VoidCallback onTap,
     required VoidCallback onRemove,
   }) => GestureDetector(
     onTap: onTap,
-    onSecondaryTap: onRemove,
-    child: SizedBox(
-      width: cartridgeSide,
-      child: Column(
-        mainAxisSize: .min,
+    child: Container(
+      width: cartridgeWidth,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: playing ? accent(context) : line(context)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
         crossAxisAlignment: .start,
         children: [
-          text(context, title, maxLines: 1),
-          const SizedBox(height: 6),
-          Container(
-            width: cartridgeSide,
-            height: cartridgeSide,
-            decoration: BoxDecoration(
-              color: screen(context),
-              border: Border.all(
-                color: playing ? accent(context) : line(context),
-              ),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: preview,
+          SizedBox(
+            width: cartridgePicture,
+            child: ColoredBox(color: screen(context), child: preview),
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: .start,
+              children: [
+                text(context, title, maxLines: 2),
+                if (year != null) ...[
+                  const SizedBox(height: 2),
+                  text(context, '$year', role: .caption),
+                ],
+                const Spacer(),
+                slots,
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: onRemove,
+            child: const EmulatorGlyph(
+              EmulatorIcon.delete,
+              size: 13,
+              color: Color(0xffe05a5a),
+            ),
+          ).clickable,
         ],
       ),
     ),
