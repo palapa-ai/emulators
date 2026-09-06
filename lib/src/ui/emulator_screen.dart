@@ -46,6 +46,7 @@ class EmulatorScreen extends StatefulWidget {
     this.onPairController,
     this.showShelf = true,
     this.showPixelShape = false,
+    this.showTrainingData = true,
     this.transportLeading,
     this.transportTrailing,
     this.onFullscreen,
@@ -70,6 +71,10 @@ class EmulatorScreen extends StatefulWidget {
   /// Offers the pixel-shape toggle. A workbench wants to compare the two; a
   /// host that has picked the television's shape should not ask again.
   final bool showPixelShape;
+
+  /// A host that puts this toggle in its own chrome turns the transport's
+  /// copy off rather than showing the player two of them.
+  final bool showTrainingData;
 
   /// Shown as a button while no pad is attached — pairing is the host's
   /// business, since only it knows how this platform opens Bluetooth.
@@ -138,6 +143,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             skin: skin,
             immersive: viewModel.fullscreen,
             showPixelShape: widget.showPixelShape,
+            showTrainingData: widget.showTrainingData,
             onFullscreen: () => _setFullscreen(!viewModel.fullscreen),
             onPairController: widget.onPairController,
             transportLeading: viewModel.fullscreen
@@ -180,6 +186,7 @@ class _Stage extends StatelessWidget {
     required this.immersive,
     required this.onFullscreen,
     this.showPixelShape = false,
+    this.showTrainingData = true,
     this.onPairController,
     this.transportLeading,
     this.transportTrailing,
@@ -189,6 +196,7 @@ class _Stage extends StatelessWidget {
   final EmulatorSkin skin;
   final bool immersive;
   final bool showPixelShape;
+  final bool showTrainingData;
   final VoidCallback onFullscreen;
   final VoidCallback? onPairController;
   final Widget? transportLeading;
@@ -280,15 +288,17 @@ class _Stage extends StatelessWidget {
         ],
         if (transportLeading != null) transportLeading ?? const SizedBox(),
         const Spacer(),
-        skin.button(
-          context,
-          label: viewModel.sharesTrainingData
-              ? 'sharing training data'
-              : 'not sharing training data',
-          icon: viewModel.sharesTrainingData ? .training : .trainingOff,
-          onTap: viewModel.toggleTrainingData,
-        ),
-        const SizedBox(width: 8),
+        if (showTrainingData) ...[
+          skin.button(
+            context,
+            label: viewModel.sharesTrainingData
+                ? 'sharing training data'
+                : 'not sharing training data',
+            icon: viewModel.sharesTrainingData ? .training : .trainingOff,
+            onTap: viewModel.toggleTrainingData,
+          ),
+          const SizedBox(width: 8),
+        ],
         skin.button(
           context,
           label: viewModel.style?.label ?? 'Raw',
