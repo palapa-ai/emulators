@@ -202,6 +202,7 @@ class EmulatorViewModel extends ChangeNotifier {
               ? session.logLines.sublist(session.logLines.length - 20)
               : session.logLines,
           recentButtons: [for (final b in session.padLog) b.label],
+          picture: await agent.screenshot(),
         ),
       );
     }();

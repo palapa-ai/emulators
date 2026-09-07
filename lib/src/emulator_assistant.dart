@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:io';
 
 import 'emulator_agent.dart';
@@ -13,6 +14,7 @@ class EmulatorAssistantContext {
     required this.logLines,
     required this.recentButtons,
     this.results = const [],
+    this.picture,
   });
 
   final String romTitle;
@@ -24,6 +26,10 @@ class EmulatorAssistantContext {
   /// What earlier tool calls in this exchange returned.
   final List<AgentResult> results;
 
+  /// The frame as a PNG, for a host whose model can look at it. Asking what
+  /// is on screen is otherwise a question only the memory can answer.
+  final Uint8List? picture;
+
   EmulatorAssistantContext after(List<AgentResult> results) =>
       EmulatorAssistantContext(
         romTitle: romTitle,
@@ -32,6 +38,7 @@ class EmulatorAssistantContext {
         logLines: logLines,
         recentButtons: recentButtons,
         results: results,
+        picture: picture,
       );
 
   String get prompt =>
