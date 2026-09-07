@@ -51,6 +51,10 @@ class EmulatorAgent {
     'peek':
         'read work RAM — the whole of it unless [offset] and [length] narrow it',
     'poke': 'write [bytes] into work RAM at [offset]',
+    'peek_video':
+        'read video memory — where a game keeps what is actually on screen '
+        'when it does not stage it in work RAM first',
+    'poke_video': 'write [bytes] into video memory at [offset]',
     'tap': 'press [button] for [frames] frames',
     'screenshot': 'the current picture as a PNG',
     'save_state': 'snapshot the whole machine',
@@ -59,8 +63,19 @@ class EmulatorAgent {
 
   /// The whole dump by default: a model reasoning about a game needs to see
   /// the memory before it can know which address it wants.
-  Uint8List? peek({int offset = 0, int? length}) {
-    final ram = _session.systemRam;
+  Uint8List? peek({int offset = 0, int? length}) =>
+      _read(_session.systemRam, offset, length);
+
+  void poke(int offset, List<int> bytes) =>
+      _write(_session.systemRam, offset, bytes);
+
+  Uint8List? peekVideo({int offset = 0, int? length}) =>
+      _read(_session.videoRam, offset, length);
+
+  void pokeVideo(int offset, List<int> bytes) =>
+      _write(_session.videoRam, offset, bytes);
+
+  static Uint8List? _read(Uint8List? ram, int offset, int? length) {
     if (ram == null || offset < 0 || offset >= ram.length) return null;
     return Uint8List.sublistView(
       ram,
@@ -69,8 +84,7 @@ class EmulatorAgent {
     );
   }
 
-  void poke(int offset, List<int> bytes) {
-    final ram = _session.systemRam;
+  static void _write(Uint8List? ram, int offset, List<int> bytes) {
     if (ram == null || offset < 0 || offset + bytes.length > ram.length) return;
     ram.setRange(offset, offset + bytes.length, bytes);
   }
@@ -132,21 +146,35 @@ class EmulatorAgent {
     return 'Stopped after $maxTurns turns of tool calls.';
   }
 
+  static String? _hex(Uint8List? bytes) => bytes == null
+      ? null
+      : bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+
   Future<Object?> run(AgentCall call) async {
     _session.log('api ${call.name}');
     switch (call.name) {
       case 'peek':
-        final bytes = peek(
-          offset: call.args['offset'] as int? ?? 0,
-          length: call.args['length'] as int?,
+        return _hex(
+          peek(
+            offset: call.args['offset'] as int? ?? 0,
+            length: call.args['length'] as int?,
+          ),
         );
-        return bytes == null
-            ? null
-            : [
-                for (final b in bytes) b.toRadixString(16).padLeft(2, '0'),
-              ].join(' ');
       case 'poke':
         poke(
+          call.args['offset'] as int? ?? 0,
+          (call.args['bytes'] as List?)?.cast<int>() ?? const [],
+        );
+        return true;
+      case 'peek_video':
+        return _hex(
+          peekVideo(
+            offset: call.args['offset'] as int? ?? 0,
+            length: call.args['length'] as int?,
+          ),
+        );
+      case 'poke_video':
+        pokeVideo(
           call.args['offset'] as int? ?? 0,
           (call.args['bytes'] as List?)?.cast<int>() ?? const [],
         );

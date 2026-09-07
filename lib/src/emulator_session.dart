@@ -144,6 +144,7 @@ class EmulatorSession extends ChangeNotifier {
   double get aspectRatio => _emulator?.aspectRatio ?? 4 / 3;
   String get coreName => _emulator?.coreName ?? '';
   Uint8List? get systemRam => _emulator?.systemRam;
+  Uint8List? get videoRam => _emulator?.videoRam;
 
   void play(RomFile rom) {
     stop();

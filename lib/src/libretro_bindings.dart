@@ -123,6 +123,12 @@ class LibretroBindings {
       ramData = lib.lookupFunction<_SramDataNative, EmuSramData>(
         'emu_ram_data',
       ),
+      videoRamSize = lib.lookupFunction<_SizeSessionNative, EmuSizeSession>(
+        'emu_video_ram_size',
+      ),
+      videoRamData = lib.lookupFunction<_SramDataNative, EmuSramData>(
+        'emu_video_ram_data',
+      ),
       audioStart = lib.lookupFunction<_IntFromSessionNative, EmuIntFromSession>(
         'emu_audio_start',
       ),
@@ -177,6 +183,8 @@ class LibretroBindings {
   final EmuSramData sramData;
   final EmuSizeSession ramSize;
   final EmuSramData ramData;
+  final EmuSizeSession videoRamSize;
+  final EmuSramData videoRamData;
   final EmuIntFromSession audioStart;
   final EmuVoidSession audioStop;
   final EmuIntFromSession audioQueued;

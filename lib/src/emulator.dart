@@ -162,6 +162,16 @@ class Emulator {
     return data.cast<Uint8>().asTypedList(size);
   }
 
+  /// The picture's own memory. A game that hands its palette straight to the
+  /// video chip never leaves that colour in work RAM.
+  Uint8List? get videoRam {
+    final size = _bindings.videoRamSize(_session);
+    final data = _bindings.videoRamData(_session);
+
+    if (size == 0 || data == nullptr) return null;
+    return data.cast<Uint8>().asTypedList(size);
+  }
+
   void writeSaveRam(Uint8List bytes) {
     final size = _bindings.sramSize(_session);
     final data = _bindings.sramData(_session);

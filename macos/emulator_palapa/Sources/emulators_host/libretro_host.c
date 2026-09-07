@@ -679,3 +679,18 @@ void *emu_ram_data(EmuSession *s)
    return s && s->get_memory_data
          ? s->get_memory_data(RETRO_MEMORY_SYSTEM_RAM) : NULL;
 }
+
+/* Where the picture's own memory lives. A game that sends its palette
+   straight to the video chip never leaves the colour in work RAM, so it
+   cannot be reached through the region above. */
+size_t emu_video_ram_size(EmuSession *s)
+{
+   return s && s->get_memory_size
+         ? s->get_memory_size(RETRO_MEMORY_VIDEO_RAM) : 0;
+}
+
+void *emu_video_ram_data(EmuSession *s)
+{
+   return s && s->get_memory_data
+         ? s->get_memory_data(RETRO_MEMORY_VIDEO_RAM) : NULL;
+}

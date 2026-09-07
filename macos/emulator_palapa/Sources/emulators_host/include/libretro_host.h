@@ -87,6 +87,8 @@ EMU_API void *emu_sram_data(EmuSession *s);
    NULL/0 when the core does not expose it. */
 EMU_API size_t emu_ram_size(EmuSession *s);
 EMU_API void *emu_ram_data(EmuSession *s);
+EMU_API size_t emu_video_ram_size(EmuSession *s);
+EMU_API void *emu_video_ram_data(EmuSession *s);
 
 #if defined(__cplusplus)
 }
