@@ -4,12 +4,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import '../controller_pairing.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import '../rom_file.dart';
-import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
+import 'emulator_transport.dart';
 import 'emulator_view_model.dart';
 import 'state_slots.dart';
 import 'style_shader_view.dart';
@@ -47,6 +46,7 @@ class EmulatorScreen extends StatefulWidget {
     this.showShelf = true,
     this.showPixelShape = false,
     this.showTrainingData = true,
+    this.showTransport = true,
     this.transportLeading,
     this.transportTrailing,
     this.onFullscreen,
@@ -75,6 +75,10 @@ class EmulatorScreen extends StatefulWidget {
   /// A host that puts this toggle in its own chrome turns the transport's
   /// copy off rather than showing the player two of them.
   final bool showTrainingData;
+
+  /// Hosts with a separate [EmulatorTransport] hide this row; fullscreen
+  /// keeps its controls over the picture.
+  final bool showTransport;
 
   /// Shown as a button while no pad is attached — pairing is the host's
   /// business, since only it knows how this platform opens Bluetooth.
@@ -144,7 +148,8 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             immersive: viewModel.fullscreen,
             showPixelShape: widget.showPixelShape,
             showTrainingData: widget.showTrainingData,
-            onFullscreen: () => _setFullscreen(!viewModel.fullscreen),
+            showTransport: widget.showTransport,
+            onFullscreen: widget.onFullscreen,
             onPairController: widget.onPairController,
             transportLeading: viewModel.fullscreen
                 ? null
@@ -184,7 +189,8 @@ class _Stage extends StatelessWidget {
     required this.viewModel,
     required this.skin,
     required this.immersive,
-    required this.onFullscreen,
+    this.onFullscreen,
+    this.showTransport = true,
     this.showPixelShape = false,
     this.showTrainingData = true,
     this.onPairController,
@@ -197,7 +203,8 @@ class _Stage extends StatelessWidget {
   final bool immersive;
   final bool showPixelShape;
   final bool showTrainingData;
-  final VoidCallback onFullscreen;
+  final bool showTransport;
+  final ValueChanged<bool>? onFullscreen;
   final VoidCallback? onPairController;
   final Widget? transportLeading;
   final Widget? transportTrailing;
@@ -208,13 +215,23 @@ class _Stage extends StatelessWidget {
     if (rom == null) return _Idle(viewModel: viewModel, skin: skin);
 
     final picture = _picture(context);
-    final transport = _transport(context);
+    final transport = EmulatorTransport(
+      viewModel: viewModel,
+      showTrainingData: showTrainingData,
+      showPixelShape: showPixelShape,
+      onPairController: onPairController,
+      onFullscreen: onFullscreen,
+      leading: transportLeading,
+      trailing: transportTrailing,
+    );
 
     // Filling the screen, the controls lie over the picture and leave when
     // the pointer settles, so nothing but the game is on screen while playing.
     if (immersive) {
       return _Immersive(picture: picture, transport: transport);
     }
+
+    if (!showTransport) return picture;
 
     return Column(
       children: [
@@ -262,100 +279,6 @@ class _Stage extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _transport(BuildContext context) {
-    return Row(
-      children: [
-        // The pad and the slots lead: they belong to the cartridge, while
-        // everything to the right of the gap belongs to the picture.
-        if (onPairController != null ||
-            (viewModel.gamepadName == null && ControllerPairing.canOpen)) ...[
-          skin.button(
-            context,
-            label: viewModel.gamepadName ?? 'Connect controller',
-            icon: .controller,
-            onTap: onPairController ?? ControllerPairing.open,
-          ),
-          const SizedBox(width: 16),
-        ],
-        if (viewModel.playing != null) ...[
-          StateSlots(viewModel: viewModel),
-          const SizedBox(width: 16),
-          StateSlots(viewModel: viewModel, saving: false),
-          const SizedBox(width: 16),
-        ],
-        if (transportLeading != null) transportLeading ?? const SizedBox(),
-        const Spacer(),
-        if (showTrainingData) ...[
-          skin.button(
-            context,
-            label: viewModel.sharesTrainingData
-                ? 'sharing training data'
-                : 'not sharing training data',
-            icon: viewModel.sharesTrainingData ? .training : .trainingOff,
-            onTap: viewModel.toggleTrainingData,
-          ),
-          const SizedBox(width: 8),
-        ],
-        skin.button(
-          context,
-          label: viewModel.style?.label ?? 'Raw',
-          icon: viewModel.style.icon,
-          onTap: viewModel.cycleStyle,
-          onSecondaryTap: () => viewModel.cycleStyle(reverse: true),
-        ),
-        const SizedBox(width: 8),
-        skin.button(
-          context,
-          label: viewModel.isMuted ? 'Unmute' : 'Mute',
-          icon: viewModel.isMuted ? .muted : .sound,
-          onTap: viewModel.toggleMuted,
-        ),
-        const SizedBox(width: 8),
-        if (showPixelShape) ...[
-          skin.button(
-            context,
-            label: viewModel.squarePixels ? '1:1' : '4:3',
-            onTap: viewModel.togglePixelShape,
-          ),
-          const SizedBox(width: 8),
-        ],
-        skin.button(
-          context,
-          label: viewModel.speed.label,
-          onTap: viewModel.cycleSpeed,
-          onSecondaryTap: () => viewModel.cycleSpeed(reverse: true),
-        ),
-        const SizedBox(width: 8),
-        // Beside the speed it governs: at 1x that button is a play triangle,
-        // and the two reading as a pair is the point.
-        skin.button(
-          context,
-          label: viewModel.isPaused ? 'Resume' : 'Pause',
-          icon: viewModel.isPaused ? .play : .pause,
-          onTap: viewModel.togglePause,
-        ),
-        const SizedBox(width: 8),
-        skin.button(
-          context,
-          label: 'Reset',
-          icon: .reset,
-          onTap: viewModel.reset,
-        ),
-        if (transportTrailing != null) ...[
-          const SizedBox(width: 8),
-          transportTrailing ?? const SizedBox(),
-        ],
-        const SizedBox(width: 8),
-        skin.button(
-          context,
-          label: immersive ? 'Leave fullscreen' : 'Fullscreen',
-          icon: immersive ? .fullscreenExit : .fullscreen,
-          onTap: onFullscreen,
-        ),
-      ],
     );
   }
 }
@@ -454,7 +377,7 @@ class _Preview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final live = viewModel.playing == rom ? viewModel.session.frames : null;
+    final live = viewModel.sessionFor(rom)?.frames;
     if (live == null) {
       return _Picture(viewModel: viewModel, image: viewModel.pictureOf(rom));
     }
@@ -517,8 +440,6 @@ class EmulatorShelf extends StatelessWidget {
                 scrollDirection: .horizontal,
                 itemCount: roms.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
-                // A card asks for its own preview as it scrolls into view;
-                // nothing emulates a cartridge nobody is looking at.
                 itemBuilder: (_, i) => skin.cartridge(
                   context,
                   title: roms[i].title,

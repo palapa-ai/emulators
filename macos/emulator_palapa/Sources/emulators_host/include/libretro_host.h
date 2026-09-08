@@ -14,9 +14,6 @@ extern "C" {
 #define EMU_API __attribute__((visibility("default")))
 #endif
 
-/* libretro cores keep their state in globals and take their callbacks as
-   global function pointers, so one loaded core can back exactly one session.
-   emu_open fails while a session is already open. */
 typedef struct EmuSession EmuSession;
 
 enum {
@@ -29,6 +26,9 @@ enum {
 EMU_API EmuSession *emu_open(const char *core_path, const char *rom_path,
       char *err, size_t err_len);
 EMU_API void emu_close(EmuSession *s);
+EMU_API int emu_load_rom(EmuSession *s, const char *rom_path,
+      char *err, size_t err_len);
+EMU_API void emu_unload_rom(EmuSession *s);
 
 EMU_API void emu_run_frame(EmuSession *s);
 

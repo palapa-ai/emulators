@@ -16,16 +16,12 @@ class EmulatorException implements Exception {
   String toString() => 'EmulatorException: $message';
 }
 
-/// One running game: a libretro core with a ROM loaded.
-///
-/// libretro cores keep their state in globals, so only one [Emulator] can be
-/// open at a time in a process; [open] throws while another is alive.
 class Emulator {
   Emulator._(
     this._bindings,
     this._session,
     this.corePath,
-    this.romPath,
+    this._romPath,
     this._isolated,
   );
 
@@ -58,10 +54,27 @@ class Emulator {
   final LibretroBindings _bindings;
   final Pointer<EmuSession> _session;
   final String corePath;
-  final String romPath;
+  String _romPath;
+  String get romPath => _romPath;
   final String _isolated;
 
   bool _closed = false;
+
+  void loadRom(String path) {
+    final rom = path.toNative();
+    final err = allocate(512).cast<Utf8>();
+    try {
+      if (_bindings.loadRom(_session, rom, err, 512) == 0) {
+        throw EmulatorException(err.toDart());
+      }
+      _romPath = path;
+    } finally {
+      release(rom);
+      release(err);
+    }
+  }
+
+  void unloadRom() => _bindings.unloadRom(_session);
 
   String get coreName => _bindings.coreName(_session).toDart();
   String get coreVersion => _bindings.coreVersion(_session).toDart();

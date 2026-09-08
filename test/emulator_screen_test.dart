@@ -25,11 +25,13 @@ void main() {
   setUp(() => temp = Directory.systemTemp.createTempSync('emulators_test'));
   tearDown(() => temp.deleteSync(recursive: true));
 
-  testWidgets('runs with no core and says so', (tester) async {
+  testWidgets('an empty collection invites the player to pick a game', (
+    tester,
+  ) async {
     await tester.pumpWidget(_wrap(EmulatorScreen(libraryRoot: temp.path)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Pick a cartridge below'), findsOneWidget);
+    expect(find.text('Pick a game'), findsOneWidget);
     expect(find.text('Collection'), findsOneWidget);
     expect(find.text('No cartridges yet'), findsOneWidget);
   });
@@ -43,7 +45,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Star Fox'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('①'), findsOneWidget);
+    expect(find.text('②'), findsOneWidget);
+    expect(find.text('③'), findsOneWidget);
   });
 
   testWidgets('a host skin replaces how the package draws', (tester) async {

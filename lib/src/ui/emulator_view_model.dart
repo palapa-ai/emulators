@@ -9,11 +9,11 @@ import '../display_style.dart';
 import '../emulator_agent.dart';
 import '../emulator_assistant.dart';
 import '../emulator_button.dart';
+import '../emulator_collection.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
 import '../rom_file.dart';
 import '../rom_library.dart';
-import '../rom_portraits.dart';
 
 /// Wires the models to the screen and holds nothing else. The shelf, the core
 /// lookup and the emulation itself live in [RomLibrary], [CoreLibrary] and
@@ -25,72 +25,20 @@ class EmulatorViewModel extends ChangeNotifier {
     this.autoPlay = false,
   }) : _library = RomLibrary(rootPath: libraryRoot),
        _cores = CoreLibrary(rootPath: libraryRoot),
-       _focused = EmulatorSession(corePath: corePath) {
-    _sessions[_focusKey] = _focused;
-    _focused.addListener(notifyListeners);
+       _collection = EmulatorCollection(corePath: corePath) {
+    _collection.addListener(notifyListeners);
     unawaited(refresh());
     if (corePath == null) unawaited(_findCore());
   }
 
-  static const _focusKey = '';
+  final EmulatorCollection _collection;
+  bool _disposed = false;
 
-  /// One session per cartridge, so every shelf card can show a live picture.
-  /// Only the focused one is audible — several soundtracks at once is noise.
-  final _sessions = <String, EmulatorSession>{};
-  final EmulatorSession _focused;
+  EmulatorSession get session => _collection.session;
 
-  EmulatorSession get session => _focused;
+  EmulatorSession? sessionFor(RomFile rom) => _collection.sessionFor(rom);
 
-  /// The playing cartridge answers with the focused session, so its card
-  /// shows the same picture as the screen rather than going blank.
-  EmulatorSession? sessionFor(RomFile rom) =>
-      rom.path == _focused.rom?.path ? _focused : _sessions[rom.path];
-
-  RomPortraits? _portraits;
-  final _pictures = <String, ui.Image>{};
-  var _capturing = false;
-
-  /// The cartridge's own picture, once it has one.
-  ui.Image? pictureOf(RomFile rom) => _pictures[rom.path];
-
-  /// Every cartridge without a picture is booted once, in turn, and closed.
-  /// Nothing on the shelf is emulating by the time the player sees it.
-  Future<void> _fillPictures() async {
-    final core = session.corePath;
-    if (core == null || _capturing) return;
-
-    _capturing = true;
-    final portraits = _portraits ??= RomPortraits(corePath: core);
-
-    try {
-      for (final rom in _roms) {
-        if (!portraits.has(rom)) await portraits.capture(rom);
-        final picture = await portraits.load(rom);
-        if (picture == null) continue;
-
-        _pictures[rom.path] = picture;
-        notifyListeners();
-      }
-    } finally {
-      _capturing = false;
-    }
-  }
-
-  /// What the player last saw, so the shelf shows where they left off rather
-  /// than the title screen they have not looked at since the first boot.
-  Future<void> _repicture(EmulatorSession from) async {
-    final rom = from.rom;
-    final frame = from.frames.value;
-    final portraits = _portraits;
-    if (rom == null || frame == null || portraits == null) return;
-
-    await portraits.save(rom, frame);
-    final picture = await portraits.load(rom);
-    if (picture == null) return;
-
-    _pictures[rom.path] = picture;
-    notifyListeners();
-  }
+  ui.Image? pictureOf(RomFile rom) => _collection.pictureOf(rom);
 
   /// Start the first cartridge as soon as both it and a core are known —
   /// for hosts that open straight into a game rather than the shelf.
@@ -182,7 +130,7 @@ class EmulatorViewModel extends ChangeNotifier {
 
   /// The assistant's hands: memory, controls, screenshots, save states,
   /// always against the game on screen.
-  late final EmulatorAgent agent = EmulatorAgent(_focused);
+  late final EmulatorAgent agent = EmulatorAgent(session);
 
   /// Null when no assistant is connected. Whatever the reply asked to do is
   /// done before the answer comes back, so the text can describe the result.
@@ -220,7 +168,9 @@ class EmulatorViewModel extends ChangeNotifier {
   SessionStatus get status => session.status;
 
   Future<void> _findCore() async {
-    session.corePath = await _cores.first();
+    final core = await _cores.first();
+    if (_disposed) return;
+    _collection.useCore(core);
     _maybeAutoPlay();
     notifyListeners();
   }
@@ -238,14 +188,17 @@ class EmulatorViewModel extends ChangeNotifier {
   Future<void> useCoreLibrary(String rootPath) async {
     _cores = CoreLibrary(rootPath: rootPath);
     if (session.corePath == null) await _findCore();
+    if (_disposed) return;
     notifyListeners();
   }
 
   Future<void> refresh() async {
-    _roms = await _library.load();
+    final roms = await _library.load();
+    if (_disposed) return;
+    _roms = roms;
     _maybeAutoPlay();
     notifyListeners();
-    unawaited(_fillPictures());
+    _collection.setRoms(_roms, lastPlayed: _lastPlayed);
   }
 
   // Opening the shelf puts you back in the game you were last in, at the
@@ -274,34 +227,28 @@ class EmulatorViewModel extends ChangeNotifier {
   }
 
   Future<void> addFiles(Iterable<String> paths) async {
-    _roms = await _library.add(paths);
+    final roms = await _library.add(paths);
+    if (_disposed) return;
+    _roms = roms;
+    _collection.setRoms(_roms, lastPlayed: _lastPlayed);
     session.log('added ${paths.length} file(s)');
     notifyListeners();
   }
 
   Future<void> remove(RomFile rom) async {
     if (session.rom == rom) session.stop();
-    _roms = await _library.remove(rom);
+    final roms = await _library.remove(rom);
+    if (_disposed) return;
+    _roms = roms;
+    _collection.setRoms(_roms, lastPlayed: _lastPlayed);
     session.log('removed ${rom.title}');
     notifyListeners();
   }
 
   Future<void> play(RomFile rom) async {
-    // Always the dedicated session. Adopting the running preview looked like
-    // a free swap, but a preview is half resolution with no sound — promoting
-    // one put a thumbnail on the screen, and left the cartridge you stepped
-    // away from emulating at full rate for nobody.
-    final parked = _focused.rom;
-    if (parked != null && _focused.isRunning) {
-      session.log('parked ${parked.title}');
-      await _repicture(_focused);
-    }
-    _park(_focused, _resumeSlot);
-    _rememberLastPlayed(rom);
-    _focused.play(rom);
-    final resumed = hasState(rom, _resumeSlot);
-    await _resume(_focused, rom, _resumeSlot);
-    if (resumed) session.log('resumed ${rom.title}');
+    await _collection.play(rom);
+    if (_disposed) return;
+    if (session.rom == rom) _rememberLastPlayed(rom);
     notifyListeners();
   }
 
@@ -315,57 +262,58 @@ class EmulatorViewModel extends ChangeNotifier {
   /// Three slots per cartridge, kept beside it on disk.
   static const slotCount = 3;
 
-  /// One more the shelf never shows: the cartridge you step away from parks
-  /// here, so clicking it puts you back where you were.
-  static const _resumeSlot = 5;
-
-  // Silent: a park happens on every swap, and a log that narrates them buries
-  // the player's own actions. play() speaks for the one move they made.
-  void _park(EmulatorSession target, int slot) {
-    final rom = target.rom;
-    if (rom == null || !target.isRunning) return;
-    final state = target.saveState();
-    if (state == null) return;
-    unawaited(File(_slotPath(rom, slot)).writeAsBytes(state));
-  }
-
-  Future<void> _resume(EmulatorSession target, RomFile rom, int slot) async {
-    final file = File(_slotPath(rom, slot));
-    if (!file.existsSync()) return;
-    target.loadState(await file.readAsBytes());
-  }
-
-  String _slotPath(RomFile rom, int slot) => '${rom.path}.state$slot';
+  String _slotPath(RomFile rom, int slot) =>
+      EmulatorCollection.statePath(rom, slot);
 
   bool hasState(RomFile rom, int slot) =>
       File(_slotPath(rom, slot)).existsSync();
 
-  Future<void> saveState(int slot) async {
+  Future<bool> saveState(int slot) async {
     final rom = session.rom;
     final state = session.saveState();
-    if (rom == null || state == null) return;
+    if (rom == null || state == null) return false;
 
-    await File(_slotPath(rom, slot)).writeAsBytes(state);
-    session.log('saved #$slot');
-    notifyListeners();
+    try {
+      final path = _slotPath(rom, slot);
+      final pending = File('$path.tmp');
+      await pending.writeAsBytes(state, flush: true);
+      await pending.rename(path);
+      if (_disposed) return false;
+      session.log('saved #$slot');
+      notifyListeners();
+      return true;
+    } on Object catch (error) {
+      if (!_disposed) session.log('could not save #$slot: $error');
+      return false;
+    }
   }
 
-  Future<void> loadState(int slot, {RomFile? from}) async {
+  Future<bool> loadState(int slot, {RomFile? from}) async {
     final rom = from ?? session.rom;
-    if (rom == null) return;
+    if (rom == null) return false;
 
     final file = File(_slotPath(rom, slot));
     if (!file.existsSync()) {
       session.log('slot $slot is empty');
-      return;
+      return false;
     }
 
-    if (from != null && from.path != session.rom?.path) await play(from);
-    if (session.loadState(await file.readAsBytes()))
+    try {
+      final state = await file.readAsBytes();
+      if (_disposed) return false;
+      if (from != null && from.path != session.rom?.path) await play(from);
+      if (_disposed || session.rom != rom || !session.loadState(state)) {
+        return false;
+      }
       session.log('loaded #$slot');
+      return true;
+    } on Object catch (error) {
+      if (!_disposed) session.log('could not load #$slot: $error');
+      return false;
+    }
   }
 
-  void stop() => session.stop();
+  void stop() => _collection.stop();
   void reset() => session.reset();
 
   void press(EmulatorButton button, {required bool pressed}) =>
@@ -373,11 +321,11 @@ class EmulatorViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    for (final session in _sessions.values) {
-      session
-        ..removeListener(notifyListeners)
-        ..dispose();
-    }
+    if (_disposed) return;
+    _disposed = true;
+    _collection
+      ..removeListener(notifyListeners)
+      ..dispose();
     super.dispose();
   }
 }
