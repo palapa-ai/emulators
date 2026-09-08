@@ -31,6 +31,7 @@ class RomFile {
     required this.path,
     required this.title,
     required this.sizeBytes,
+    this.aliases = const [],
   });
 
   factory RomFile.at(String path) {
@@ -40,6 +41,22 @@ class RomFile {
       title: titleFor(path),
       sizeBytes: file.existsSync() ? file.lengthSync() : 0,
     );
+  }
+
+  /// Identical copies kept on disk so their snapshots remain recoverable.
+  final List<String> aliases;
+  Iterable<String> get allPaths => [path, ...aliases];
+
+  String? existingSidecar(String suffix) {
+    final files =
+        allPaths
+            .map((path) => File('$path$suffix'))
+            .where((file) => file.existsSync())
+            .toList()
+          ..sort(
+            (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
+          );
+    return files.firstOrNull?.path;
   }
 
   final String path;

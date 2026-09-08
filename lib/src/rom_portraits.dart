@@ -26,7 +26,7 @@ class RomPortraits {
 
   File _fileFor(RomFile rom) => File('${rom.path}.png');
 
-  bool has(RomFile rom) => _fileFor(rom).existsSync();
+  bool has(RomFile rom) => rom.existingSidecar('.png') != null;
 
   Future<void> save(RomFile rom, ui.Image frame) async {
     final data = await frame.toByteData(format: ui.ImageByteFormat.png);
@@ -35,8 +35,9 @@ class RomPortraits {
   }
 
   Future<ui.Image?> load(RomFile rom) async {
-    final file = _fileFor(rom);
-    if (!file.existsSync()) return null;
+    final path = rom.existingSidecar('.png');
+    if (path == null) return null;
+    final file = File(path);
 
     final codec = await ui.instantiateImageCodec(await file.readAsBytes());
     return (await codec.getNextFrame()).image;

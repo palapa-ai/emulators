@@ -29,7 +29,7 @@ void main() {
     await tester.pumpWidget(_wrap(EmulatorScreen(libraryRoot: temp.path)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Pick a cartridge below'), findsOneWidget);
+    expect(find.text('Pick a game'), findsOneWidget);
     expect(find.text('Collection'), findsOneWidget);
     expect(find.text('No cartridges yet'), findsOneWidget);
   });
@@ -39,11 +39,17 @@ void main() {
       ..createSync(recursive: true)
       ..childFile('Star Fox (U) (V1.2) [!].smc').writeAsBytesSync([0, 1, 2]);
 
-    await tester.pumpWidget(_wrap(EmulatorScreen(libraryRoot: temp.path)));
+    final model = EmulatorViewModel(
+      libraryRoot: temp.path,
+    );
+    await tester.runAsync(model.refresh);
+    await tester.pumpWidget(_wrap(EmulatorScreen(viewModel: model)));
     await tester.pumpAndSettle();
 
     expect(find.text('Star Fox'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
   });
 
   testWidgets('a host skin replaces how the package draws', (tester) async {

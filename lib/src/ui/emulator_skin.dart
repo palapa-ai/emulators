@@ -29,6 +29,7 @@ enum EmulatorIcon {
   trainingOff,
   fullscreen,
   fullscreenExit,
+  filter,
   styleRaw,
   styleVhs,
   styleTrinitron,
@@ -111,50 +112,58 @@ class EmulatorSkin {
     EmulatorIcon? icon,
     VoidCallback? onSecondaryTap,
     bool labelled = false,
-  }) => _Hoverable(
-    onTap: onTap,
-    onSecondaryTap: onSecondaryTap,
-    builder: (hovered) => Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: icon == null ? 12 : 8,
-        vertical: 7,
+  }) => Semantics(
+    label: label,
+    button: true,
+    child: _Hoverable(
+      onTap: onTap,
+      onSecondaryTap: onSecondaryTap,
+      builder: (hovered) => Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: icon == null ? 12 : 8,
+          vertical: 7,
+        ),
+        decoration: BoxDecoration(
+          color: hovered ? const Color(0x14ffffff) : null,
+          border: Border.all(
+            color: hovered ? const Color(0x66ffffff) : line(context),
+          ),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: switch ((icon, labelled)) {
+          (null, _) => Text(
+            label,
+            style: textStyle(
+              context,
+              EmulatorTextRole.caption,
+            ).copyWith(color: _tone(context, hovered)),
+          ),
+          (final icon?, false) => EmulatorGlyph(
+            icon,
+            color: _tone(context, hovered),
+          ),
+          (final icon?, true) => Row(
+            mainAxisSize: .min,
+            children: [
+              EmulatorGlyph(icon, size: 13, color: _tone(context, hovered)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: textStyle(
+                  context,
+                  EmulatorTextRole.caption,
+                ).copyWith(color: _tone(context, hovered)),
+              ),
+            ],
+          ),
+        },
       ),
-      decoration: BoxDecoration(
-        color: hovered ? const Color(0x14ffffff) : null,
-        border: Border.all(
-          color: hovered ? const Color(0x66ffffff) : line(context),
-        ),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: switch ((icon, labelled)) {
-        (null, _) => Text(
-          label,
-          style: textStyle(
-            context,
-            EmulatorTextRole.caption,
-          ).copyWith(color: _tone(context, hovered)),
-        ),
-        (final icon?, false) => EmulatorGlyph(
-          icon,
-          color: _tone(context, hovered),
-        ),
-        (final icon?, true) => Row(
-          mainAxisSize: .min,
-          children: [
-            EmulatorGlyph(icon, size: 13, color: _tone(context, hovered)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: textStyle(
-                context,
-                EmulatorTextRole.caption,
-              ).copyWith(color: _tone(context, hovered)),
-            ),
-          ],
-        ),
-      },
     ),
   );
+
+  /// A hover hint that a host may render in its own design system.
+  Widget hint(BuildContext context, String message, Widget child) =>
+      _Hint(message: message, skin: this, child: child);
 
   Color? _tone(BuildContext context, bool hovered) => hovered
       ? const Color(0xffe8e8ee)
@@ -297,5 +306,75 @@ class _HoverableState extends State<_Hoverable> {
       onSecondaryTap: widget.onSecondaryTap,
       child: widget.builder(_hovered),
     ).clickable,
+  );
+}
+
+class _Hint extends StatefulWidget {
+  const _Hint({required this.message, required this.skin, required this.child});
+  final String message;
+  final EmulatorSkin skin;
+  final Widget child;
+
+  @override
+  State<_Hint> createState() => _HintState();
+}
+
+class _HintState extends State<_Hint> {
+  final _link = LayerLink();
+  OverlayEntry? _entry;
+
+  void _show() {
+    if (_entry != null) return;
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+    _entry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: 0,
+        top: 0,
+        child: IgnorePointer(
+          child: CompositedTransformFollower(
+            link: _link,
+            targetAnchor: Alignment.topCenter,
+            followerAnchor: Alignment.bottomCenter,
+            offset: const Offset(0, -6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: widget.skin.background(context),
+                border: Border.all(color: widget.skin.line(context)),
+              ),
+              child: widget.skin.text(context, widget.message, role: .caption),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_entry!);
+  }
+
+  void _hide() {
+    _entry?.remove();
+    _entry?.dispose();
+    _entry = null;
+  }
+
+  @override
+  void dispose() {
+    _hide();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    tooltip: widget.message,
+    child: CompositedTransformTarget(
+      link: _link,
+      child: MouseRegion(
+        opaque: false,
+        onEnter: (_) => _show(),
+        onExit: (_) => _hide(),
+        child: widget.child,
+      ),
+    ),
   );
 }
