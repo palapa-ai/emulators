@@ -20,6 +20,11 @@ typedef EmuOpen =
       int,
     );
 
+typedef _LoadRomNative =
+    Int Function(Pointer<EmuSession>, Pointer<Utf8>, Pointer<Utf8>, Size);
+typedef EmuLoadRom =
+    int Function(Pointer<EmuSession>, Pointer<Utf8>, Pointer<Utf8>, int);
+
 typedef _VoidSessionNative = Void Function(Pointer<EmuSession>);
 typedef EmuVoidSession = void Function(Pointer<EmuSession>);
 
@@ -63,6 +68,10 @@ typedef EmuSetQuality = void Function(Pointer<EmuSession>, int, int);
 class LibretroBindings {
   LibretroBindings._(DynamicLibrary lib)
     : open = lib.lookupFunction<_OpenNative, EmuOpen>('emu_open'),
+      loadRom = lib.lookupFunction<_LoadRomNative, EmuLoadRom>('emu_load_rom'),
+      unloadRom = lib.lookupFunction<_VoidSessionNative, EmuVoidSession>(
+        'emu_unload_rom',
+      ),
       close = lib.lookupFunction<_VoidSessionNative, EmuVoidSession>(
         'emu_close',
       ),
@@ -163,6 +172,8 @@ class LibretroBindings {
   );
 
   final EmuOpen open;
+  final EmuLoadRom loadRom;
+  final EmuVoidSession unloadRom;
   final EmuVoidSession close;
   final EmuVoidSession runFrame;
   final EmuVoidSession reset;

@@ -21,6 +21,7 @@ export 'src/ui/emulator_icons.dart';
 export 'src/ui/emulator_screen.dart'
     show EmulatorScreen, EmulatorShelf, keyBindings;
 export 'src/ui/emulator_skin.dart';
+export 'src/ui/emulator_transport.dart';
 export 'src/ui/emulator_view_model.dart';
 export 'src/ui/memory_view.dart';
 export 'src/ui/state_slots.dart';
