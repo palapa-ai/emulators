@@ -35,14 +35,22 @@ enum DisplayStyle {
   ),
   arcade(
     label: 'Arcade',
+    curvature: 0.09,
+    chroma: 0.55,
+    vignette: 0.22,
+    phosphor: true,
+    phosphorDepth: 0.84,
     scanline: 0.4,
     scanlineDepth: 0.41,
     tint: Color(0xfff8ebff),
   ),
   homeTv(
     label: 'Home TV',
-    verticalStripe: 0.34,
-    verticalStripeDepth: 0.47,
+    curvature: 0.13,
+    chroma: 0.85,
+    vignette: 0.32,
+    scanline: 0.28,
+    scanlineDepth: 0.7,
     tint: Color(0xfffffcf5),
   ),
   dotMatrix(
@@ -68,6 +76,16 @@ enum DisplayStyle {
     tint: Color(0xff9bcd55),
     audio: StyleAudio.handheld,
   ),
+  projector(label: 'Projector', vignette: 0.45, tint: Color(0xffffefd6)),
+  lcd(
+    label: 'LCD',
+    phosphor: true,
+    phosphorDepth: 0.93,
+    pixelGap: 0.08,
+    pixelGapDepth: 0.83,
+    tint: Color(0xfff4f8ff),
+  ),
+  oled(label: 'OLED'),
   composite(
     label: 'Composite',
     scanline: 0.25,
@@ -90,8 +108,27 @@ enum DisplayStyle {
     this.phosphor = false,
     this.shader = false,
     this.audio = StyleAudio.clean,
+    this.curvature = 0,
+    this.chroma = 0,
+    this.vignette = 0,
   });
 
+  /// The public cycle omits legacy presets while keeping their saved names valid.
+  static const cycleOrder = [
+    gameBoy,
+    nes,
+    vhs,
+    arcade,
+    homeTv,
+    projector,
+    dotMatrix,
+    lcd,
+    oled,
+  ];
+
+  final double curvature;
+  final double chroma;
+  final double vignette;
   final String label;
   final double scanline;
   final double scanlineDepth;
@@ -118,8 +155,10 @@ enum DisplayStyle {
   /// Which extra pass the style shader runs: composite video for the looks
   /// born of one wire, the DMG panel for the handheld.
   double get shaderMode => switch (this) {
-    nes || composite => 1,
+    nes || composite || arcade || homeTv => 1,
     gameBoy => 2,
+    projector => 3,
+    oled => 4,
     _ => 0,
   };
 

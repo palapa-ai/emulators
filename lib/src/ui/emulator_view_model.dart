@@ -153,20 +153,15 @@ class EmulatorViewModel extends ChangeNotifier {
   }
 
   /// null is the raw picture; cycling walks the styles and returns to it.
-  DisplayStyle? _style = DisplayStyle.vhs;
+  DisplayStyle? _style;
   DisplayStyle? get style => _style;
 
   void cycleStyle({bool reverse = false}) {
-    final current = _style;
-    final last = DisplayStyle.values.length - 1;
-    _style = switch ((current, reverse)) {
-      (null, false) => DisplayStyle.values.first,
-      (null, true) => DisplayStyle.values.last,
-      (final style?, false) when style.index == last => null,
-      (final style?, true) when style.index == 0 => null,
-      (final style?, false) => DisplayStyle.values[style.index + 1],
-      (final style?, true) => DisplayStyle.values[style.index - 1],
-    };
+    final cycle = <DisplayStyle?>[null, ...DisplayStyle.cycleOrder];
+    final index = cycle.indexOf(_style);
+    _style = index < 0
+        ? null
+        : cycle[(index + (reverse ? -1 : 1)) % cycle.length];
     final audio = _style?.audio ?? StyleAudio.clean;
     session.setAudioQuality(bits: audio.bits, mono: audio.mono);
     session.log(_style?.label.toLowerCase() ?? 'raw');
@@ -264,7 +259,7 @@ class EmulatorViewModel extends ChangeNotifier {
     final file = File('${_library.rootPath}/$_lastPlayedFile');
     if (_library.rootPath == null || !file.existsSync()) return null;
     final path = file.readAsStringSync().trim();
-    return _roms.where((r) => r.path == path).firstOrNull;
+    return _roms.where((r) => r.allPaths.contains(path)).firstOrNull;
   }
 
   void _rememberLastPlayed(RomFile rom) {
@@ -330,7 +325,9 @@ class EmulatorViewModel extends ChangeNotifier {
   }
 
   Future<void> _resume(EmulatorSession target, RomFile rom, int slot) async {
-    final file = File(_slotPath(rom, slot));
+    final file = File(
+      rom.existingSidecar('.state$slot') ?? _slotPath(rom, slot),
+    );
     if (!file.existsSync()) return;
     target.loadState(await file.readAsBytes());
   }
@@ -338,7 +335,7 @@ class EmulatorViewModel extends ChangeNotifier {
   String _slotPath(RomFile rom, int slot) => '${rom.path}.state$slot';
 
   bool hasState(RomFile rom, int slot) =>
-      File(_slotPath(rom, slot)).existsSync();
+      rom.existingSidecar('.state$slot') != null;
 
   Future<void> saveState(int slot) async {
     final rom = session.rom;
@@ -354,7 +351,9 @@ class EmulatorViewModel extends ChangeNotifier {
     final rom = from ?? session.rom;
     if (rom == null) return;
 
-    final file = File(_slotPath(rom, slot));
+    final file = File(
+      rom.existingSidecar('.state$slot') ?? _slotPath(rom, slot),
+    );
     if (!file.existsSync()) {
       session.log('slot $slot is empty');
       return;

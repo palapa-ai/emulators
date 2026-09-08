@@ -12,7 +12,10 @@ uniform vec2 uStripe;
 uniform vec2 uGap;
 uniform vec2 uPhosphor;   // on/off, depth
 uniform vec3 uTint;
-uniform float uMode;      // 0 plain, 1 composite video, 2 DMG panel
+uniform float uMode;      // 0 plain, 1 composite, 2 DMG, 3 projector, 4 OLED
+uniform float uCurvature;
+uniform float uChroma;
+uniform float uVignette;
 uniform sampler2D uTexture;
 
 out vec4 fragColor;
@@ -33,6 +36,13 @@ float luma(vec3 c) {
 
 void main() {
   vec2 uv = FlutterFragCoord().xy / uSize;
+  vec2 screen = uv * 2.0 - 1.0;
+  vec2 curved = screen * (1.0 + uCurvature * dot(screen, screen));
+  uv = curved * 0.5 + 0.5;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) {
+    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
 
   // The style's own grid, not the core's: an NES look reads at 256x240
   // whatever the core hands over, so sampling snaps to the style's cells.
@@ -87,7 +97,33 @@ void main() {
     color = mix(vec3(0.06, 0.14, 0.06), uTint, level);
   }
 
-  float m = 1.0;
+  if (uChroma > 0.0) {
+    // Slight channel separation at the edge of the curved glass.
+    vec2 offset = vec2(uChroma / grid.x, 0.0);
+    color.r = mix(color.r, texture(uTexture, clamp(centre + offset, 0.0, 1.0)).r, 0.35);
+    color.b = mix(color.b, texture(uTexture, clamp(centre - offset, 0.0, 1.0)).b, 0.35);
+  }
+
+  if (uMode == 3.0) {
+    // A projected image has soft focus, visible grain, lamp flicker and
+    // raised blacks; the light falls off toward the edge of the screen.
+    vec2 texel = 1.0 / grid;
+    vec3 soft = (texture(uTexture, clamp(centre + vec2(texel.x, 0.0), 0.0, 1.0)).rgb
+               + texture(uTexture, clamp(centre - vec2(texel.x, 0.0), 0.0, 1.0)).rgb
+               + texture(uTexture, clamp(centre + vec2(0.0, texel.y), 0.0, 1.0)).rgb
+               + texture(uTexture, clamp(centre - vec2(0.0, texel.y), 0.0, 1.0)).rgb) * 0.25;
+    float grain = fract(sin(dot(floor(cell) + floor(uTime * 24.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+    color = mix(color, soft, 0.4) * (0.96 + 0.018 * sin(uTime * 150.8));
+    color = color * 0.92 + 0.035 + grain * 0.045;
+  }
+
+  if (uMode == 4.0) {
+    // Clean emissive pixels: deep blacks with a restrained saturation lift.
+    float grey = luma(color);
+    color = max(vec3(0.0), mix(vec3(grey), color, 1.08) * 1.035 - 0.012);
+  }
+
+  float m = 1.0 - uVignette * clamp(dot(screen, screen) * 0.5, 0.0, 1.0);
   if (uScanline.x > 0.0 && f.y >= 1.0 - uScanline.x) m *= uScanline.y;
   if (uStripe.x > 0.0 && f.x >= 1.0 - uStripe.x) m *= uStripe.y;
   if (uGap.x > 0.0 && (f.x >= 1.0 - uGap.x || f.y >= 1.0 - uGap.x)) {

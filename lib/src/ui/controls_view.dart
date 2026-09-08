@@ -1,90 +1,102 @@
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import '../emulator_button.dart';
-import 'emulator_screen.dart';
+import '../controller_pairing.dart';
+import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 
-/// What the keyboard does, and what the pad is doing right now.
-///
-/// The bindings were only ever inside the key handler, so the one question a
-/// player actually asks — which key is B? — had nowhere to be answered.
+/// The demo's controller status and live input ticker, shared by every host.
 class ControlsView extends StatelessWidget {
-  const ControlsView({required this.viewModel, super.key});
+  const ControlsView({
+    required this.viewModel,
+    this.skin,
+    this.showTrainingData = true,
+    this.onPairController,
+    super.key,
+  });
 
   final EmulatorViewModel viewModel;
-
-  static final _order = [
-    EmulatorButton.up,
-    EmulatorButton.down,
-    EmulatorButton.left,
-    EmulatorButton.right,
-    EmulatorButton.a,
-    EmulatorButton.b,
-    EmulatorButton.x,
-    EmulatorButton.y,
-    EmulatorButton.l,
-    EmulatorButton.r,
-    EmulatorButton.start,
-    EmulatorButton.select,
-  ];
-
-  /// The key that stands for a button, named the way a keycap is.
-  static String _keyFor(EmulatorButton button) {
-    for (final entry in keyBindings.entries) {
-      if (entry.value != button) continue;
-      return switch (entry.key) {
-        LogicalKeyboardKey.arrowUp => '↑',
-        LogicalKeyboardKey.arrowDown => '↓',
-        LogicalKeyboardKey.arrowLeft => '←',
-        LogicalKeyboardKey.arrowRight => '→',
-        LogicalKeyboardKey.enter => '⏎',
-        LogicalKeyboardKey.shiftRight => '⇧ right',
-        final key => key.keyLabel,
-      };
-    }
-    return '—';
-  }
+  final EmulatorSkin? skin;
+  final bool showTrainingData;
+  final VoidCallback? onPairController;
 
   @override
-  Widget build(BuildContext context) {
-    final skin = EmulatorTheme.of(context);
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: viewModel,
+    builder: (context, _) =>
+        _content(context, skin ?? EmulatorTheme.of(context)),
+  );
 
-    return ListenableBuilder(
-      listenable: viewModel,
-      builder: (context, _) {
-        final held = viewModel.heldMask;
-
-        return ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            for (final button in _order)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    // A held button lights, so the panel doubles as the
-                    // answer to "is this pad even reaching the game".
-                    skin.text(
-                      context,
-                      button.label,
-                      role: held & (1 << button.id) != 0
-                          ? EmulatorTextRole.body
-                          : EmulatorTextRole.caption,
-                    ),
-                    const Spacer(),
-                    skin.text(
-                      context,
-                      _keyFor(button),
-                      role: EmulatorTextRole.caption,
-                    ),
-                  ],
+  Widget _content(BuildContext context, EmulatorSkin skin) {
+    final presses = viewModel.padLog;
+    return skin.panel(
+      context,
+      title: '',
+      child: Column(
+        crossAxisAlignment: .stretch,
+        mainAxisSize: .min,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: .center,
+            children: [
+              if (showTrainingData)
+                skin.button(
+                  context,
+                  label: viewModel.sharesTrainingData
+                      ? 'sharing training data'
+                      : 'not sharing training data',
+                  icon: viewModel.sharesTrainingData ? .training : .trainingOff,
+                  labelled: true,
+                  onTap: viewModel.toggleTrainingData,
                 ),
-              ),
-          ],
-        );
-      },
+              if (viewModel.padName case final pad?)
+                Row(
+                  mainAxisSize: .min,
+                  children: [
+                    const EmulatorGlyph(EmulatorIcon.controller, size: 13),
+                    const SizedBox(width: 6),
+                    skin.text(context, pad, role: .caption),
+                  ],
+                )
+              else if (onPairController != null || ControllerPairing.canOpen)
+                skin.button(
+                  context,
+                  label: 'Connect controller',
+                  icon: .controller,
+                  labelled: true,
+                  onTap: onPairController ?? ControllerPairing.open,
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 24,
+            child: Row(
+              children: [
+                skin.text(context, 'Controller #1', role: .caption),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ListView.separated(
+                    scrollDirection: .horizontal,
+                    reverse: true,
+                    itemCount: presses.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) => Center(
+                      child: skin.text(
+                        context,
+                        presses[presses.length - 1 - i].label,
+                        role: i == 0 ? .heading : .caption,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

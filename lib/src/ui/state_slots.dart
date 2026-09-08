@@ -25,8 +25,6 @@ class StateSlots extends StatelessWidget {
   final bool saving;
   final bool showIcon;
 
-  static const _numerals = ['①', '②', '③'];
-
   @override
   Widget build(BuildContext context) {
     final skin = EmulatorTheme.of(context);
@@ -42,22 +40,59 @@ class StateSlots extends StatelessWidget {
           ),
         for (var slot = 1; slot <= EmulatorViewModel.slotCount; slot++) ...[
           const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () => saving
-                ? viewModel.saveState(slot)
-                : viewModel.loadState(slot, from: rom),
-            child: Text(
-              _numerals[slot - 1],
-              style: TextStyle(
-                fontSize: 20,
-                color: target != null && viewModel.hasState(target, slot)
-                    ? skin.accent(context)
-                    : skin.textStyle(context, EmulatorTextRole.caption).color,
-              ),
-            ),
-          ).clickable,
+          _slot(context, skin, target, slot),
         ],
       ],
+    );
+  }
+
+  Widget _slot(
+    BuildContext context,
+    EmulatorSkin skin,
+    RomFile? target,
+    int slot,
+  ) {
+    final occupied = target != null && viewModel.hasState(target, slot);
+    final enabled = target != null && (saving || occupied);
+    final label = '${saving ? 'Save' : 'Load'} slot $slot';
+    final color = occupied
+        ? skin.accent(context)
+        : skin.textStyle(context, EmulatorTextRole.caption).color;
+    return skin.hint(
+      context,
+      label,
+      Semantics(
+        label: label,
+        button: true,
+        enabled: enabled,
+        selected: occupied,
+        child: MouseRegion(
+          cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+          child: GestureDetector(
+            onTap: !enabled
+                ? null
+                : () => saving
+                      ? viewModel.saveState(slot)
+                      : viewModel.loadState(slot, from: rom),
+            child: Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: occupied ? skin.accent(context) : skin.line(context),
+                ),
+              ),
+              child: Text(
+                '$slot',
+                style: skin
+                    .textStyle(context, EmulatorTextRole.caption)
+                    .copyWith(color: color),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
