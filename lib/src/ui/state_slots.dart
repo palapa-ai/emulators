@@ -79,9 +79,12 @@ class StateSlots extends StatelessWidget {
               height: 24,
               alignment: Alignment.center,
               decoration: BoxDecoration(
+                color: (occupied ? skin.accent(context) : skin.line(context))
+                    .withValues(alpha: occupied ? 0.18 : 0.08),
                 border: Border.all(
                   color: occupied ? skin.accent(context) : skin.line(context),
                 ),
+                shape: BoxShape.circle,
               ),
               child: Text(
                 '$slot',
