@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -45,6 +44,7 @@ class EmulatorScreen extends StatefulWidget {
     this.autoPlay = false,
     this.onPairController,
     this.showShelf = true,
+    this.showTransport = true,
     this.showPixelShape = false,
     this.showTrainingData = true,
     this.showFullscreen = true,
@@ -68,6 +68,8 @@ class EmulatorScreen extends StatefulWidget {
 
   /// Hosts that give the collection its own place on screen turn this off.
   final bool showShelf;
+
+  final bool showTransport;
 
   /// Offers the pixel-shape toggle. A workbench wants to compare the two; a
   /// host that has picked the television's shape should not ask again.
@@ -146,6 +148,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             viewModel: viewModel,
             skin: skin,
             immersive: viewModel.fullscreen,
+            showTransport: widget.showTransport,
             showPixelShape: widget.showPixelShape,
             showTrainingData: widget.showTrainingData,
             showFullscreen: widget.showFullscreen,
@@ -190,6 +193,7 @@ class _Stage extends StatelessWidget {
     required this.skin,
     required this.immersive,
     required this.onFullscreen,
+    this.showTransport = true,
     this.showPixelShape = false,
     this.showTrainingData = true,
     this.showFullscreen = true,
@@ -201,6 +205,7 @@ class _Stage extends StatelessWidget {
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
   final bool immersive;
+  final bool showTransport;
   final bool showPixelShape;
   final bool showTrainingData;
 
@@ -228,8 +233,7 @@ class _Stage extends StatelessWidget {
     return Column(
       children: [
         Expanded(child: picture),
-        const SizedBox(height: 8),
-        transport,
+        if (showTransport) ...[const SizedBox(height: 8), transport],
       ],
     );
   }
@@ -534,11 +538,6 @@ class EmulatorShelf extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final rowHeight = skin.cartridgePicture * 3 / 4 + 20;
-            final grid =
-                constraints.hasBoundedHeight &&
-                constraints.maxHeight >= rowHeight * 2 + 8 &&
-                constraints.maxWidth >= skin.cartridgeWidth * 2 + 8;
-
             Widget cartridge(int i) => skin.cartridge(
               context,
               title: roms[i].title,
@@ -567,35 +566,21 @@ class EmulatorShelf extends StatelessWidget {
                 ),
               );
             }
-            final content = grid
-                ? GridView.builder(
-                    padding: EdgeInsets.zero,
-                    itemCount: roms.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount:
-                          ((constraints.maxWidth + 8) /
-                                  (skin.cartridgeWidth + 8))
-                              .floor(),
-                      mainAxisExtent: rowHeight,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemBuilder: (_, i) => cartridge(i),
-                  )
-                : SizedBox(
-                    height: constraints.hasBoundedHeight
-                        ? math.min(rowHeight, constraints.maxHeight)
-                        : rowHeight,
-                    child: ListView.separated(
-                      scrollDirection: .horizontal,
-                      itemCount: roms.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) => cartridge(i),
-                    ),
-                  );
-            return constraints.hasBoundedHeight && !grid
-                ? Align(alignment: Alignment.topLeft, child: content)
-                : content;
+            return GridView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: !constraints.hasBoundedHeight,
+              itemCount: roms.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount:
+                    ((constraints.maxWidth + 8) / (skin.cartridgeWidth + 8))
+                        .floor()
+                        .clamp(1, roms.length),
+                mainAxisExtent: rowHeight,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemBuilder: (_, i) => cartridge(i),
+            );
           },
         ),
       ),

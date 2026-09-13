@@ -128,7 +128,7 @@ void main() {
   );
 
   testWidgets(
-    'square slots distinguish occupied loads and preserve save/load behavior',
+    'round slots distinguish occupied loads and preserve save/load behavior',
     (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -169,6 +169,8 @@ void main() {
           .single;
       expect(occupied.properties.selected, isTrue);
       expect(empty.properties.enabled, isFalse);
+      expect(slot.decoration, isA<BoxDecoration>());
+      expect((slot.decoration! as BoxDecoration).shape, BoxShape.circle);
     },
   );
 
@@ -252,53 +254,71 @@ void main() {
     },
   );
 
-  testWidgets(
-    'wide collection is a grid and compact collections are lazy horizontal shelves',
-    (tester) async {
-      console.games = List.generate(
-        40,
-        (i) => RomFile(path: '/fixture/$i.smc', title: 'Game $i', sizeBytes: 1),
-      );
-      await tester.pumpWidget(
-        _wrap(EmulatorShelf(viewModel: console, skin: const EmulatorSkin())),
-      );
-      expect(find.byType(GridView), findsOneWidget);
-      expect(find.text('Game 39'), findsNothing);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(
-        _wrap(
-          EmulatorShelf(viewModel: console, skin: const EmulatorSkin()),
-          size: const Size(400, 500),
+  testWidgets('collections stay in a vertical grid at every width', (
+    tester,
+  ) async {
+    console.games = List.generate(
+      40,
+      (i) => RomFile(path: '/fixture/$i.smc', title: 'Game $i', sizeBytes: 1),
+    );
+    await tester.pumpWidget(
+      _wrap(EmulatorShelf(viewModel: console, skin: const EmulatorSkin())),
+    );
+    expect(find.byType(GridView), findsOneWidget);
+    expect(find.text('Game 39'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(
+      _wrap(
+        EmulatorShelf(viewModel: console, skin: const EmulatorSkin()),
+        size: const Size(400, 500),
+      ),
+    );
+    expect(find.byType(GridView), findsOneWidget);
+    expect(
+      tester.widget<GridView>(find.byType(GridView)).scrollDirection,
+      Axis.vertical,
+    );
+    expect(find.text('Game 39'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Game 39'),
+      800,
+      scrollable: find.byType(Scrollable),
+      maxScrolls: 20,
+    );
+    await tester.drag(find.byType(GridView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Game 39'));
+    expect(console.chosen!.title, 'Game 39');
+    await tester.pumpWidget(
+      _wrap(
+        EmulatorShelf(viewModel: console, skin: const EmulatorSkin()),
+        size: const Size(800, 220),
+      ),
+    );
+    expect(find.byType(GridView), findsOneWidget);
+    expect(
+      tester.widget<GridView>(find.byType(GridView)).scrollDirection,
+      Axis.vertical,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a host can move the transport into its own title actions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        EmulatorScreen(
+          viewModel: console,
+          showShelf: false,
+          showTransport: false,
         ),
-      );
-      expect(find.byType(GridView), findsNothing);
-      expect(
-        tester.widget<ListView>(find.byType(ListView)).scrollDirection,
-        Axis.horizontal,
-      );
-      expect(find.text('Game 39'), findsNothing);
-      await tester.scrollUntilVisible(
-        find.text('Game 39'),
-        800,
-        scrollable: find.byType(Scrollable),
-        maxScrolls: 20,
-      );
-      await tester.drag(find.byType(ListView), const Offset(-500, 0));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Game 39'));
-      expect(console.chosen!.title, 'Game 39');
-      await tester.pumpWidget(
-        _wrap(
-          EmulatorShelf(viewModel: console, skin: const EmulatorSkin()),
-          size: const Size(800, 220),
-        ),
-      );
-      expect(find.byType(GridView), findsNothing);
-      expect(
-        tester.widget<ListView>(find.byType(ListView)).scrollDirection,
-        Axis.horizontal,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+
+    expect(_glyph(EmulatorIcon.filter), findsNothing);
+    expect(_glyph(EmulatorIcon.sound), findsNothing);
+    expect(find.byKey(const ValueKey('emulator-picture')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

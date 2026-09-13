@@ -99,8 +99,6 @@ enum DisplayStyle {
     this.nativeHeight = 0,
     this.scanline = 0,
     this.scanlineDepth = 1,
-    this.verticalStripe = 0,
-    this.verticalStripeDepth = 1,
     this.pixelGap = 0,
     this.pixelGapDepth = 1,
     this.phosphorDepth = 1,
@@ -132,8 +130,8 @@ enum DisplayStyle {
   final String label;
   final double scanline;
   final double scanlineDepth;
-  final double verticalStripe;
-  final double verticalStripeDepth;
+  final double verticalStripe = 0;
+  final double verticalStripeDepth = 1;
   final double pixelGap;
   final double pixelGapDepth;
   final double phosphorDepth;
