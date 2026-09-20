@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'collapsing_panel.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
+import 'memory_dump.dart';
 
 /// The debugger's window on work RAM: a hex dump that follows the running
 /// game, with the bytes that moved since the last look picked out.
@@ -19,8 +20,6 @@ class MemoryView extends StatefulWidget {
 }
 
 class _MemoryViewState extends State<MemoryView> {
-  static const _bytesPerRow = 16;
-
   Timer? _poll;
   Uint8List? _current;
   Uint8List? _previous;
@@ -72,128 +71,7 @@ class _MemoryViewState extends State<MemoryView> {
       ],
       child: ram == null
           ? Center(child: skin.text(context, 'No RAM exposed', role: .caption))
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                // One line when the panel can hold offset, hex and text side
-                // by side; otherwise the text drops to its own line below.
-                final style = _monoStyle(skin, context);
-                final painter = TextPainter(
-                  text: TextSpan(text: '0' * 10, style: style),
-                  textDirection: TextDirection.ltr,
-                )..layout();
-                final charWidth = painter.width / 10;
-                final wide = constraints.maxWidth >= charWidth * 74;
-
-                return ListView.builder(
-                  // Every row is the same height whether or not its bytes
-                  // spell anything, or the list would shift under the reader
-                  // each time a byte became printable.
-                  itemExtent: wide ? 18 : 34,
-                  itemCount: (ram.length / _bytesPerRow).ceil(),
-                  itemBuilder: (context, row) => _Row(
-                    skin: skin,
-                    ram: ram,
-                    previous: _previous,
-                    offset: row * _bytesPerRow,
-                    wide: wide,
-                  ),
-                );
-              },
-            ),
-    );
-  }
-}
-
-TextStyle _monoStyle(EmulatorSkin skin, BuildContext context) =>
-    // Hex columns only line up in a fixed-width face.
-    skin
-        .textStyle(context, EmulatorTextRole.caption)
-        .copyWith(
-          fontFamily: 'Menlo',
-          fontFamilyFallback: const ['Monaco', 'Courier New', 'monospace'],
-        );
-
-class _Row extends StatelessWidget {
-  const _Row({
-    required this.skin,
-    required this.ram,
-    required this.previous,
-    required this.offset,
-    required this.wide,
-  });
-
-  final EmulatorSkin skin;
-  final Uint8List ram;
-  final Uint8List? previous;
-  final int offset;
-  final bool wide;
-
-  @override
-  Widget build(BuildContext context) {
-    final base = _monoStyle(skin, context);
-    final quiet = base.color ?? const Color(0x8ce8e8ee);
-    final hot = skin.accent(context);
-    final end = (offset + _MemoryViewState._bytesPerRow).clamp(0, ram.length);
-
-    final hex = <TextSpan>[];
-    final ascii = StringBuffer();
-    for (var i = offset; i < end; i++) {
-      final byte = ram[i];
-      final moved = previous != null && i < previous!.length
-          ? previous![i] != byte
-          : false;
-      hex.add(
-        TextSpan(
-          text: '${byte.toRadixString(16).padLeft(2, '0')} ',
-          style: moved ? base.copyWith(color: hot) : null,
-        ),
-      );
-      ascii.write(
-        byte >= 0x20 && byte < 0x7f ? String.fromCharCode(byte) : '.',
-      );
-    }
-
-    final label = TextSpan(
-      text: '${offset.toRadixString(16).padLeft(6, '0')}  ',
-    );
-
-    // A row of zeros spells nothing; a line of dots under it is noise.
-    final readable = ascii.toString().replaceAll('.', '').isNotEmpty;
-
-    if (wide) {
-      return Text.rich(
-        TextSpan(
-          style: base.copyWith(color: quiet),
-          children: [
-            label,
-            ...hex,
-            if (readable) TextSpan(text: ' $ascii'),
-          ],
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.clip,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: .start,
-      children: [
-        Text.rich(
-          TextSpan(
-            style: base.copyWith(color: quiet),
-            children: [label, ...hex],
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.clip,
-        ),
-        if (readable)
-          Text(
-            '        ↳ $ascii',
-            style: base.copyWith(color: quiet),
-            maxLines: 1,
-            overflow: TextOverflow.clip,
-          ),
-      ],
+          : MemoryDump(current: ram, previous: _previous),
     );
   }
 }
