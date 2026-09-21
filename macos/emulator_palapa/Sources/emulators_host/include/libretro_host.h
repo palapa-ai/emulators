@@ -11,7 +11,7 @@ extern "C" {
 #if defined(_WIN32)
 #define EMU_API __declspec(dllexport)
 #else
-#define EMU_API __attribute__((visibility("default")))
+#define EMU_API __attribute__((visibility("default"), used))
 #endif
 
 /* libretro cores keep their state in globals and take their callbacks as
