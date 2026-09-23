@@ -9,6 +9,7 @@ import '../display_style.dart';
 import '../emulator_agent.dart';
 import '../emulator_assistant.dart';
 import '../emulator_button.dart';
+import '../emulator_previews.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
 import '../rom_file.dart';
@@ -26,17 +27,13 @@ class EmulatorViewModel extends ChangeNotifier {
   }) : _library = RomLibrary(rootPath: libraryRoot),
        _cores = CoreLibrary(rootPath: libraryRoot),
        _focused = EmulatorSession(corePath: corePath) {
-    _sessions[_focusKey] = _focused;
     _focused.addListener(notifyListeners);
     unawaited(refresh());
     if (corePath == null) unawaited(_findCore());
   }
 
-  static const _focusKey = '';
-
-  /// One session per cartridge, so every shelf card can show a live picture.
-  /// Only the focused one is audible — several soundtracks at once is noise.
-  final _sessions = <String, EmulatorSession>{};
+  final _previews = EmulatorPreviews();
+  bool _disposed = false;
   final EmulatorSession _focused;
 
   EmulatorSession get session => _focused;
@@ -44,35 +41,48 @@ class EmulatorViewModel extends ChangeNotifier {
   /// The playing cartridge answers with the focused session, so its card
   /// shows the same picture as the screen rather than going blank.
   EmulatorSession? sessionFor(RomFile rom) =>
-      rom.path == _focused.rom?.path ? _focused : _sessions[rom.path];
+      rom.path == _focused.rom?.path ? _focused : _previews.sessionFor(rom);
+
+  EmulatorSession? retainPreview(RomFile rom) => rom.path == _focused.rom?.path
+      ? _focused
+      : _previews.retain(rom, session.corePath);
+
+  void releasePreview(RomFile rom, EmulatorSession? preview) =>
+      _previews.release(rom, preview);
+
+  void stopPreviews() => _previews.stop();
 
   RomPortraits? _portraits;
   final _pictures = <String, ui.Image>{};
-  var _capturing = false;
+  var _loadingPictures = false;
 
   /// The cartridge's own picture, once it has one.
   ui.Image? pictureOf(RomFile rom) => _pictures[rom.path];
 
-  /// Every cartridge without a picture is booted once, in turn, and closed.
-  /// Nothing on the shelf is emulating by the time the player sees it.
-  Future<void> _fillPictures() async {
+  Future<void> _loadPictures() async {
     final core = session.corePath;
-    if (core == null || _capturing) return;
+    if (core == null || _loadingPictures || _disposed) return;
 
-    _capturing = true;
+    _loadingPictures = true;
     final portraits = _portraits ??= RomPortraits(corePath: core);
 
     try {
-      for (final rom in _roms) {
-        if (!portraits.has(rom)) await portraits.capture(rom);
-        final picture = await portraits.load(rom);
-        if (picture == null) continue;
+      await Future.forEach(_roms, (rom) async {
+        if (_disposed) return;
 
+        final picture = await portraits.load(rom);
+        if (picture == null) return;
+        if (_disposed) {
+          picture.dispose();
+          return;
+        }
+
+        _pictures.remove(rom.path)?.dispose();
         _pictures[rom.path] = picture;
         notifyListeners();
-      }
+      });
     } finally {
-      _capturing = false;
+      _loadingPictures = false;
     }
   }
 
@@ -215,7 +225,10 @@ class EmulatorViewModel extends ChangeNotifier {
   SessionStatus get status => session.status;
 
   Future<void> _findCore() async {
-    session.corePath = await _cores.first();
+    final core = await _cores.first();
+    if (_disposed) return;
+
+    session.corePath = core;
     _maybeAutoPlay();
     notifyListeners();
   }
@@ -237,10 +250,13 @@ class EmulatorViewModel extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    _roms = await _library.load();
+    final roms = await _library.load();
+    if (_disposed) return;
+
+    _roms = roms;
     _maybeAutoPlay();
     notifyListeners();
-    unawaited(_fillPictures());
+    unawaited(_loadPictures());
   }
 
   // Opening the shelf puts you back in the game you were last in, at the
@@ -372,11 +388,13 @@ class EmulatorViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    for (final session in _sessions.values) {
-      session
-        ..removeListener(notifyListeners)
-        ..dispose();
-    }
+    _disposed = true;
+    _previews.dispose();
+    _focused
+      ..removeListener(notifyListeners)
+      ..dispose();
+    _pictures.values.forEach((picture) => picture.dispose());
+    _pictures.clear();
     super.dispose();
   }
 }

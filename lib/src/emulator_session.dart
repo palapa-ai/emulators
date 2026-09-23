@@ -403,9 +403,15 @@ class EmulatorSession extends ChangeNotifier {
         targetHeight: preview ? height ~/ 2 : null,
       );
 
+      final image = await completer.future;
+      if (!identical(_emulator, emulator)) {
+        image.dispose();
+        return;
+      }
+
       final stale = _stale;
       _stale = frames.value;
-      frames.value = await completer.future;
+      frames.value = image;
       stale?.dispose();
 
       if (_pauseOnFrame) {

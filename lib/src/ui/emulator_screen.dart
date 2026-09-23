@@ -471,27 +471,61 @@ class _Idle extends StatelessWidget {
   }
 }
 
-/// A cartridge's own picture: the frame it was photographed on, or the one
-/// the player is looking at when it is the game on the screen.
-class _Preview extends StatelessWidget {
+class _Preview extends StatefulWidget {
   const _Preview({required this.viewModel, required this.rom});
 
   final EmulatorViewModel viewModel;
   final RomFile rom;
 
   @override
+  State<_Preview> createState() => _PreviewState();
+}
+
+class _PreviewState extends State<_Preview> {
+  EmulatorSession? _live;
+
+  @override
+  void initState() {
+    super.initState();
+    _live = widget.viewModel.retainPreview(widget.rom);
+  }
+
+  @override
+  void didUpdateWidget(covariant _Preview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.viewModel, widget.viewModel) &&
+        oldWidget.rom == widget.rom &&
+        _live != null &&
+        identical(_live, widget.viewModel.sessionFor(widget.rom))) {
+      return;
+    }
+
+    oldWidget.viewModel.releasePreview(oldWidget.rom, _live);
+    _live = widget.viewModel.retainPreview(widget.rom);
+  }
+
+  @override
+  void dispose() {
+    widget.viewModel.releasePreview(widget.rom, _live);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final live = viewModel.playing == rom ? viewModel.session.frames : null;
+    final live = _live;
     if (live == null) {
-      return _Picture(viewModel: viewModel, image: viewModel.pictureOf(rom));
+      return _Picture(
+        viewModel: widget.viewModel,
+        image: widget.viewModel.pictureOf(widget.rom),
+      );
     }
 
     return RepaintBoundary(
       child: ValueListenableBuilder<ui.Image?>(
-        valueListenable: live,
+        valueListenable: live.frames,
         builder: (context, frame, _) => _Picture(
-          viewModel: viewModel,
-          image: frame ?? viewModel.pictureOf(rom),
+          viewModel: widget.viewModel,
+          image: frame ?? widget.viewModel.pictureOf(widget.rom),
         ),
       ),
     );
