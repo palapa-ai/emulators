@@ -39,7 +39,7 @@ class EmulatorSession extends ChangeNotifier {
   /// looking at closely.
   final bool preview;
 
-  static const previewFps = 60;
+  static const previewFps = 10;
 
   /// Discovered after construction when a host did not name one, so the
   /// screen can render before the lookup finishes.
