@@ -59,9 +59,9 @@ class StateSlots extends StatelessWidget {
     final enabled =
         target != null &&
         (saving
-            ? target.path == viewModel.playing?.path && feedback != 'Saving'
+            ? target.path == viewModel.playing?.path && feedback != .saving
             : occupied);
-    final label = '${feedback ?? (saving ? 'Save' : 'Load')} slot $slot';
+    final label = '${feedback?.label ?? (saving ? 'Save' : 'Load')} slot $slot';
     final color = occupied
         ? skin.accent(context)
         : skin.textStyle(context, EmulatorTextRole.caption).color;
@@ -94,12 +94,7 @@ class StateSlots extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Text(
-                switch (feedback) {
-                  'Saving' => '…',
-                  'Saved' => '✓',
-                  'Save failed' => '!',
-                  _ => '$slot',
-                },
+                feedback?.symbol ?? '$slot',
                 style: skin
                     .textStyle(context, EmulatorTextRole.caption)
                     .copyWith(color: color),

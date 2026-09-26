@@ -13,6 +13,7 @@ import '../emulator_previews.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
 import '../rom_file.dart';
+import '../save_feedback.dart';
 import '../rom_library.dart';
 import '../rom_portraits.dart';
 
@@ -353,23 +354,23 @@ class EmulatorViewModel extends ChangeNotifier {
   bool hasState(RomFile rom, int slot) =>
       rom.existingSidecar('.state$slot') != null;
 
-  final Map<(String, int), String> saveFeedback = {};
+  final Map<(String, int), SaveFeedback> saveFeedback = {};
 
   Future<void> saveState(int slot) async {
     final rom = session.rom;
     if (rom == null || slot < 1 || slot > slotCount) return;
     final key = (rom.path, slot);
-    if (saveFeedback[key] == 'Saving') return;
-    saveFeedback[key] = 'Saving';
+    if (saveFeedback[key] == .saving) return;
+    saveFeedback[key] = .saving;
     notifyListeners();
     try {
       final state = session.saveState();
       if (state == null) throw StateError('No save state available');
       await File(_slotPath(rom, slot)).writeAsBytes(state, flush: true);
-      saveFeedback[key] = 'Saved';
+      saveFeedback[key] = .saved;
       session.log('saved #$slot');
     } catch (error) {
-      saveFeedback[key] = 'Save failed';
+      saveFeedback[key] = .failed;
       session.log('could not save #$slot: $error');
     }
     if (!_disposed) notifyListeners();

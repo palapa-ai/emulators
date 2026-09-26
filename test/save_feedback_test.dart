@@ -37,13 +37,13 @@ void main() {
       directory.deleteSync(recursive: true);
     });
     final saving = console.saveState(1);
-    expect(console.saveFeedback[(rom.path, 1)], 'Saving');
+    expect(console.saveFeedback[(rom.path, 1)], SaveFeedback.saving);
     await saving;
     expect(File('${rom.path}.state1').readAsBytesSync(), [1, 2, 3]);
-    expect(console.saveFeedback[(rom.path, 1)], 'Saved');
+    expect(console.saveFeedback[(rom.path, 1)], SaveFeedback.saved);
     session.bytes = null;
     await console.saveState(2);
-    expect(console.saveFeedback[(rom.path, 2)], 'Save failed');
+    expect(console.saveFeedback[(rom.path, 2)], SaveFeedback.failed);
     expect(File('${rom.path}.state2').existsSync(), isFalse);
   });
 }
