@@ -112,6 +112,7 @@ class EmulatorSkin {
     EmulatorIcon? icon,
     VoidCallback? onSecondaryTap,
     bool labelled = false,
+    bool preserveLabelCase = false,
   }) => Semantics(
     label: label,
     button: true,

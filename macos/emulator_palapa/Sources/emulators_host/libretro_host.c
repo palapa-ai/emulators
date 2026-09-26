@@ -55,7 +55,7 @@ struct EmuSession {
    int audio_mono;
    int audio_discard;
 
-   int16_t buttons[EMU_BUTTON_COUNT];
+   int16_t buttons[2][EMU_BUTTON_COUNT];
    int16_t last_input_mask;
 
    struct retro_system_info info;
@@ -305,23 +305,23 @@ static int16_t cb_input_state(unsigned port, unsigned device, unsigned index,
 {
    (void)index;
 
-   if (!active || port != 0 || device != RETRO_DEVICE_JOYPAD)
+   if (!active || port >= 2 || device != RETRO_DEVICE_JOYPAD)
       return 0;
 
    if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
    {
       int16_t mask = 0;
       for (int i = 0; i < EMU_BUTTON_COUNT; i++)
-         if (active->buttons[i])
+         if (active->buttons[port][i])
             mask |= (int16_t)(1 << i);
-      active->last_input_mask = mask;
+      if (port == 0) active->last_input_mask = mask;
       return mask;
    }
 
    if (id >= EMU_BUTTON_COUNT)
       return 0;
 
-   return active->buttons[id];
+   return active->buttons[port][id];
 }
 
 static void *sym(void *lib, const char *name)
@@ -595,8 +595,13 @@ void emu_audio_stop(EmuSession *s)
 
 void emu_set_button(EmuSession *s, int button, int pressed)
 {
-   if (s && button >= 0 && button < EMU_BUTTON_COUNT)
-      s->buttons[button] = pressed ? 1 : 0;
+   emu_set_player_button(s, 0, button, pressed);
+}
+
+void emu_set_player_button(EmuSession *s, int port, int button, int pressed)
+{
+   if (s && port >= 0 && port < 2 && button >= 0 && button < EMU_BUTTON_COUNT)
+      s->buttons[port][button] = pressed ? 1 : 0;
 }
 
 void emu_reset(EmuSession *s)

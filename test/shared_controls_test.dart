@@ -106,6 +106,7 @@ void main() {
     'shared Controls shows live demo ticker, pairing and sharing state',
     (tester) async {
       var paired = false;
+      console.controlsFor(.p1).update(.human, 1 << EmulatorButton.start.id);
       await tester.pumpWidget(
         _wrap(
           ControlsView(
@@ -114,7 +115,8 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Controller #1'), findsOneWidget);
+      expect(find.text('Human P1'), findsOneWidget);
+      expect(find.text('Human P2'), findsOneWidget);
       expect(find.text('START'), findsOneWidget);
       expect(find.text('Z'), findsNothing);
       await tester.tap(find.text('Connect controller'));

@@ -13,10 +13,11 @@ import '../emulator_preview.dart';
 import '../emulator_previews.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
+import '../player_controls.dart';
 import '../rom_file.dart';
-import '../save_feedback.dart';
 import '../rom_library.dart';
 import '../rom_portraits.dart';
+import '../save_feedback.dart';
 
 /// Wires the models to the screen and holds nothing else. The shelf, the core
 /// lookup and the emulation itself live in [RomLibrary], [CoreLibrary] and
@@ -216,6 +217,12 @@ class EmulatorViewModel extends ChangeNotifier
     }();
   }
 
+  PlayerControls controlsFor(EmulatorPlayer player) =>
+      session.controlsFor(player);
+  String? padNameFor(EmulatorPlayer player) => session.padNameFor(player);
+  void assignPlayer(EmulatorPlayer player, ControllerDriver driver) =>
+      session.assignPlayer(player, driver);
+
   int get heldMask => session.heldMask;
   int get padMask => session.padMask;
   String? get padName => session.padName;
@@ -398,8 +405,11 @@ class EmulatorViewModel extends ChangeNotifier
   void stop() => session.stop();
   void reset() => session.reset();
 
-  void press(EmulatorButton button, {required bool pressed}) =>
-      session.press(button, pressed: pressed);
+  void press(
+    EmulatorButton button, {
+    required bool pressed,
+    EmulatorPlayer player = .p1,
+  }) => session.press(button, pressed: pressed, player: player);
 
   @override
   void dispose() {
