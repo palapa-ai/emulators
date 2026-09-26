@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:common_mvvm/common_mvvm.dart' as mvvm;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -8,6 +9,7 @@ import '../controller_pairing.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import '../rom_file.dart';
+import 'emulator_preview_view_model.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 import 'state_slots.dart';
@@ -464,61 +466,31 @@ class _Idle extends StatelessWidget {
   }
 }
 
-class _Preview extends StatefulWidget {
-  const _Preview({required this.viewModel, required this.rom});
+class _Preview extends mvvm.View<EmulatorPreviewViewModel> {
+  _Preview({required EmulatorViewModel viewModel, required this.rom})
+    : console = viewModel,
+      super(() => EmulatorPreviewViewModel(viewModel, rom));
 
-  final EmulatorViewModel viewModel;
+  final EmulatorViewModel console;
   final RomFile rom;
 
   @override
-  State<_Preview> createState() => _PreviewState();
-}
-
-class _PreviewState extends State<_Preview> {
-  EmulatorSession? _live;
-
-  @override
-  void initState() {
-    super.initState();
-    _live = widget.viewModel.retainPreview(widget.rom);
-  }
-
-  @override
-  void didUpdateWidget(covariant _Preview oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (identical(oldWidget.viewModel, widget.viewModel) &&
-        oldWidget.rom == widget.rom &&
-        _live != null &&
-        identical(_live, widget.viewModel.sessionFor(widget.rom))) {
-      return;
-    }
-
-    oldWidget.viewModel.releasePreview(oldWidget.rom, _live);
-    _live = widget.viewModel.retainPreview(widget.rom);
-  }
-
-  @override
-  void dispose() {
-    widget.viewModel.releasePreview(widget.rom, _live);
-    super.dispose();
-  }
+  void updateViewModel(EmulatorPreviewViewModel viewModel) =>
+      viewModel.update(console, rom);
 
   @override
   Widget build(BuildContext context) {
-    final live = _live;
+    final live = viewModel.session;
     if (live == null) {
-      return _Picture(
-        viewModel: widget.viewModel,
-        image: widget.viewModel.pictureOf(widget.rom),
-      );
+      return _Picture(viewModel: console, image: console.pictureOf(rom));
     }
 
     return RepaintBoundary(
       child: ValueListenableBuilder<ui.Image?>(
         valueListenable: live.frames,
         builder: (context, frame, _) => _Picture(
-          viewModel: widget.viewModel,
-          image: frame ?? widget.viewModel.pictureOf(widget.rom),
+          viewModel: console,
+          image: frame ?? console.pictureOf(rom),
         ),
       ),
     );

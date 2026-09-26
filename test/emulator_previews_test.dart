@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:emulator_palapa/src/emulator_previews.dart';
+import 'package:emulator_palapa/src/emulator_preview.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -90,6 +91,32 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     expect(model.previews.created.every((session) => session.disposed), isTrue);
     model.dispose();
+    root.deleteSync(recursive: true);
+  });
+
+  test('preview ownership follows replaced sources and releases once', () {
+    final root = Directory.systemTemp.createTempSync('preview-owner');
+    final one = _Shelf(libraryRoot: root.path);
+    final two = _Shelf(libraryRoot: root.path);
+    final preview = EmulatorPreview(one, first);
+    preview.update(one, first);
+    expect(one.previews.created, hasLength(1));
+
+    preview.update(two, second);
+    expect(one.previews.created.single.disposed, isTrue);
+    expect(two.previews.created.single.opened, second);
+    two.previews.stop();
+    preview.update(two, second);
+    expect(two.previews.created, hasLength(2));
+    expect(preview.session, same(two.previews.created.last));
+
+    preview.cancel();
+    preview.cancel();
+    preview.update(one, first);
+    expect(preview.session, isNull);
+    expect(two.previews.created.every((session) => session.disposed), isTrue);
+    one.dispose();
+    two.dispose();
     root.deleteSync(recursive: true);
   });
 
