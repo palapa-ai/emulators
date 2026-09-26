@@ -225,6 +225,12 @@ void main() {
         ),
       );
       expect(_glyph(EmulatorIcon.filter), findsOneWidget);
+      final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await pointer.addPointer(location: Offset.zero);
+      await pointer.moveTo(
+        tester.getCenter(find.byKey(const ValueKey('emulator-picture'))),
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Raw'), findsOneWidget);
       expect(_glyph(EmulatorIcon.fullscreen), findsNothing);
       expect(find.text('4:3'), findsNothing);
@@ -246,6 +252,7 @@ void main() {
       );
       await tester.tap(picture);
       expect(console.pauses, 1);
+      await pointer.removePointer();
       console.active = false;
       console.notifyListeners();
       await tester.pump();

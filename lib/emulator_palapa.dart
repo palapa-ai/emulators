@@ -25,3 +25,4 @@ export 'src/ui/emulator_view_model.dart';
 export 'src/ui/memory_view.dart';
 export 'src/ui/state_slots.dart';
 export 'src/ui/style_shader_view.dart';
+export 'src/save_feedback.dart';
