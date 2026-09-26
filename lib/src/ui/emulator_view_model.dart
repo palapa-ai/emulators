@@ -9,6 +9,7 @@ import '../display_style.dart';
 import '../emulator_agent.dart';
 import '../emulator_assistant.dart';
 import '../emulator_button.dart';
+import '../emulator_preview.dart';
 import '../emulator_previews.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
@@ -19,7 +20,8 @@ import '../rom_portraits.dart';
 /// Wires the models to the screen and holds nothing else. The shelf, the core
 /// lookup and the emulation itself live in [RomLibrary], [CoreLibrary] and
 /// [EmulatorSession] — this only forwards.
-class EmulatorViewModel extends ChangeNotifier {
+class EmulatorViewModel extends ChangeNotifier
+    implements EmulatorPreviewSource {
   EmulatorViewModel({
     String? corePath,
     String? libraryRoot,
