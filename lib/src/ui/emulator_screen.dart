@@ -224,18 +224,9 @@ class _Stage extends StatelessWidget {
     final picture = _picture(context);
     final transport = _transport(context);
 
-    // Filling the screen, the controls lie over the picture and leave when
-    // the pointer settles, so nothing but the game is on screen while playing.
-    if (immersive) {
-      return _Immersive(picture: picture, transport: transport);
-    }
-
-    return Column(
-      children: [
-        Expanded(child: picture),
-        if (showTransport) ...[const SizedBox(height: 8), transport],
-      ],
-    );
+    return showTransport || immersive
+        ? _Immersive(picture: picture, transport: transport)
+        : picture;
   }
 
   Widget _picture(BuildContext context) {
@@ -291,12 +282,6 @@ class _Stage extends StatelessWidget {
           icon: .controller,
           onTap: onPairController ?? ControllerPairing.open,
         ),
-        const SizedBox(width: 16),
-      ],
-      if (viewModel.playing != null) ...[
-        StateSlots(viewModel: viewModel),
-        const SizedBox(width: 16),
-        StateSlots(viewModel: viewModel, saving: false),
         const SizedBox(width: 16),
       ],
       if (transportLeading != null) transportLeading ?? const SizedBox(),
@@ -402,14 +387,9 @@ class _Immersive extends StatefulWidget {
 class _ImmersiveState extends State<_Immersive> {
   static const _linger = Duration(seconds: 3);
 
-  bool _showing = true;
+  bool _showing = false;
+  bool _focused = false;
   Timer? _hide;
-
-  @override
-  void initState() {
-    super.initState();
-    _wake();
-  }
 
   @override
   void dispose() {
@@ -420,33 +400,46 @@ class _ImmersiveState extends State<_Immersive> {
   void _wake() {
     _hide?.cancel();
     _hide = Timer(_linger, () {
-      if (mounted) setState(() => _showing = false);
+      if (mounted && !_focused) setState(() => _showing = false);
     });
     if (!_showing) setState(() => _showing = true);
   }
 
   @override
-  Widget build(BuildContext context) => MouseRegion(
-    onHover: (_) => _wake(),
-    cursor: _showing ? SystemMouseCursors.basic : SystemMouseCursors.none,
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        widget.picture,
-        Positioned(
-          left: 24,
-          right: 24,
-          bottom: 24,
-          child: IgnorePointer(
-            ignoring: !_showing,
-            child: AnimatedOpacity(
-              opacity: _showing ? 1 : 0,
-              duration: const Duration(milliseconds: 220),
-              child: widget.transport,
+  Widget build(BuildContext context) => Focus(
+    onFocusChange: (focused) {
+      _focused = focused;
+      if (focused) _wake();
+    },
+    child: Listener(
+      onPointerDown: (_) => _wake(),
+      child: MouseRegion(
+        onEnter: (_) => _wake(),
+        onExit: (_) {
+          if (!_focused) setState(() => _showing = false);
+        },
+        onHover: (_) => _wake(),
+        cursor: SystemMouseCursors.basic,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            widget.picture,
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: 24,
+              child: IgnorePointer(
+                ignoring: !_showing,
+                child: AnimatedOpacity(
+                  opacity: _showing ? 1 : 0,
+                  duration: const Duration(milliseconds: 220),
+                  child: widget.transport,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 }
@@ -571,18 +564,20 @@ class EmulatorShelf extends StatelessWidget {
         fill: outerConstraints.hasBoundedHeight,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final rowHeight = skin.cartridgePicture * 3 / 4 + 20;
+            final rowHeight = skin.cartridgePicture * 3 / 4 + 48;
             Widget cartridge(int i) => skin.cartridge(
               context,
               title: roms[i].title,
               year: roms[i].year,
               playing: roms[i] == viewModel.playing,
               preview: _Preview(viewModel: viewModel, rom: roms[i]),
-              slots: StateSlots(
-                viewModel: viewModel,
-                rom: roms[i],
-                saving: false,
-                showIcon: false,
+              slots: Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  StateSlots(viewModel: viewModel, rom: roms[i]),
+                  StateSlots(viewModel: viewModel, rom: roms[i], saving: false),
+                ],
               ),
               onTap: () => viewModel.play(roms[i]),
               onRemove: () => viewModel.remove(roms[i]),

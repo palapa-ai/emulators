@@ -12,7 +12,7 @@ uniform vec2 uStripe;
 uniform vec2 uGap;
 uniform vec2 uPhosphor;   // on/off, depth
 uniform vec3 uTint;
-uniform float uMode;      // 0 plain, 1 composite, 2 DMG, 3 projector, 4 OLED
+uniform float uMode;      // 0 plain, 1 composite, 2 DMG, 3 projector, 4 OLED, 5 NES
 uniform float uCurvature;
 uniform float uChroma;
 uniform float uVignette;
@@ -34,6 +34,92 @@ float luma(vec3 c) {
   return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
+// Fixed 2C02 RGB decoding of the NES's 64 color codes. Composite televisions
+// vary, so this preset uses one palette and never adds off-palette CRT effects.
+// Hardware color-code reference: https://www.nesdev.org/wiki/PPU_palettes
+vec3 nesPalette(int index) {
+  if (index == 0) return vec3(84.0, 84.0, 84.0);
+  if (index == 1) return vec3(0.0, 30.0, 116.0);
+  if (index == 2) return vec3(8.0, 16.0, 144.0);
+  if (index == 3) return vec3(48.0, 0.0, 136.0);
+  if (index == 4) return vec3(68.0, 0.0, 100.0);
+  if (index == 5) return vec3(92.0, 0.0, 48.0);
+  if (index == 6) return vec3(84.0, 4.0, 0.0);
+  if (index == 7) return vec3(60.0, 24.0, 0.0);
+  if (index == 8) return vec3(32.0, 42.0, 0.0);
+  if (index == 9) return vec3(8.0, 58.0, 0.0);
+  if (index == 10) return vec3(0.0, 64.0, 0.0);
+  if (index == 11) return vec3(0.0, 60.0, 0.0);
+  if (index == 12) return vec3(0.0, 50.0, 60.0);
+  if (index == 13) return vec3(0.0, 0.0, 0.0);
+  if (index == 14) return vec3(0.0, 0.0, 0.0);
+  if (index == 15) return vec3(0.0, 0.0, 0.0);
+  if (index == 16) return vec3(152.0, 150.0, 152.0);
+  if (index == 17) return vec3(8.0, 76.0, 196.0);
+  if (index == 18) return vec3(48.0, 50.0, 236.0);
+  if (index == 19) return vec3(92.0, 30.0, 228.0);
+  if (index == 20) return vec3(136.0, 20.0, 176.0);
+  if (index == 21) return vec3(160.0, 20.0, 100.0);
+  if (index == 22) return vec3(152.0, 34.0, 32.0);
+  if (index == 23) return vec3(120.0, 60.0, 0.0);
+  if (index == 24) return vec3(84.0, 90.0, 0.0);
+  if (index == 25) return vec3(40.0, 114.0, 0.0);
+  if (index == 26) return vec3(8.0, 124.0, 0.0);
+  if (index == 27) return vec3(0.0, 118.0, 40.0);
+  if (index == 28) return vec3(0.0, 102.0, 120.0);
+  if (index == 29) return vec3(0.0, 0.0, 0.0);
+  if (index == 30) return vec3(0.0, 0.0, 0.0);
+  if (index == 31) return vec3(0.0, 0.0, 0.0);
+  if (index == 32) return vec3(236.0, 238.0, 236.0);
+  if (index == 33) return vec3(76.0, 154.0, 236.0);
+  if (index == 34) return vec3(120.0, 124.0, 236.0);
+  if (index == 35) return vec3(176.0, 98.0, 236.0);
+  if (index == 36) return vec3(228.0, 84.0, 236.0);
+  if (index == 37) return vec3(236.0, 88.0, 180.0);
+  if (index == 38) return vec3(236.0, 106.0, 100.0);
+  if (index == 39) return vec3(212.0, 136.0, 32.0);
+  if (index == 40) return vec3(160.0, 170.0, 0.0);
+  if (index == 41) return vec3(116.0, 196.0, 0.0);
+  if (index == 42) return vec3(76.0, 208.0, 32.0);
+  if (index == 43) return vec3(56.0, 204.0, 108.0);
+  if (index == 44) return vec3(56.0, 180.0, 204.0);
+  if (index == 45) return vec3(60.0, 60.0, 60.0);
+  if (index == 46) return vec3(0.0, 0.0, 0.0);
+  if (index == 47) return vec3(0.0, 0.0, 0.0);
+  if (index == 48) return vec3(236.0, 238.0, 236.0);
+  if (index == 49) return vec3(168.0, 204.0, 236.0);
+  if (index == 50) return vec3(188.0, 188.0, 236.0);
+  if (index == 51) return vec3(212.0, 178.0, 236.0);
+  if (index == 52) return vec3(236.0, 174.0, 236.0);
+  if (index == 53) return vec3(236.0, 174.0, 212.0);
+  if (index == 54) return vec3(236.0, 180.0, 176.0);
+  if (index == 55) return vec3(228.0, 196.0, 144.0);
+  if (index == 56) return vec3(204.0, 210.0, 120.0);
+  if (index == 57) return vec3(180.0, 222.0, 120.0);
+  if (index == 58) return vec3(168.0, 226.0, 144.0);
+  if (index == 59) return vec3(152.0, 226.0, 180.0);
+  if (index == 60) return vec3(160.0, 214.0, 228.0);
+  if (index == 61) return vec3(160.0, 162.0, 160.0);
+  if (index == 62) return vec3(0.0, 0.0, 0.0);
+  if (index == 63) return vec3(0.0, 0.0, 0.0);
+  return vec3(0.0);
+}
+
+vec3 nesColor(vec3 source) {
+  vec3 sampleColor = source * 255.0;
+  vec3 nearest = nesPalette(0);
+  float distance = 1e10;
+  for (int i = 0; i < 64; i++) {
+    vec3 delta = sampleColor - nesPalette(i);
+    float candidate = dot(delta, delta);
+    if (candidate < distance) {
+      distance = candidate;
+      nearest = nesPalette(i);
+    }
+  }
+  return nearest / 255.0;
+}
+
 void main() {
   vec2 uv = FlutterFragCoord().xy / uSize;
   vec2 screen = uv * 2.0 - 1.0;
@@ -53,6 +139,11 @@ void main() {
   float row = floor(cell.y);
 
   vec3 color = texture(uTexture, centre).rgb;
+
+  if (uMode == 5.0) {
+    fragColor = vec4(nesColor(color), 1.0);
+    return;
+  }
 
   if (uMode == 1.0) {
     // Composite video: brightness and colour share one wire. Luma keeps its

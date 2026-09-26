@@ -35,7 +35,7 @@ enum DisplayStyle {
   ),
   arcade(
     label: 'Arcade',
-    curvature: 0.09,
+    curvature: 0.045,
     chroma: 0.55,
     vignette: 0.22,
     phosphor: true,
@@ -46,7 +46,7 @@ enum DisplayStyle {
   ),
   homeTv(
     label: 'Home TV',
-    curvature: 0.13,
+    curvature: 0.065,
     chroma: 0.85,
     vignette: 0.32,
     scanline: 0.28,
@@ -59,14 +59,7 @@ enum DisplayStyle {
     pixelGapDepth: 0.43,
     tint: Color(0xfffafaff),
   ),
-  nes(
-    label: 'NES',
-    nativeWidth: 256,
-    nativeHeight: 240,
-    scanline: 0.3,
-    scanlineDepth: 0.78,
-    tint: Color(0xfffdf6f0),
-  ),
+  nes(label: 'NES', nativeWidth: 256, nativeHeight: 240),
   gameBoy(
     label: 'Game Boy',
     nativeWidth: 160,
@@ -153,7 +146,8 @@ enum DisplayStyle {
   /// Which extra pass the style shader runs: composite video for the looks
   /// born of one wire, the DMG panel for the handheld.
   double get shaderMode => switch (this) {
-    nes || composite || arcade || homeTv => 1,
+    nes => 5,
+    composite || arcade || homeTv => 1,
     gameBoy => 2,
     projector => 3,
     oled => 4,

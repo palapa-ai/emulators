@@ -353,14 +353,26 @@ class EmulatorViewModel extends ChangeNotifier {
   bool hasState(RomFile rom, int slot) =>
       rom.existingSidecar('.state$slot') != null;
 
+  final Map<(String, int), String> saveFeedback = {};
+
   Future<void> saveState(int slot) async {
     final rom = session.rom;
-    final state = session.saveState();
-    if (rom == null || state == null) return;
-
-    await File(_slotPath(rom, slot)).writeAsBytes(state);
-    session.log('saved #$slot');
+    if (rom == null || slot < 1 || slot > slotCount) return;
+    final key = (rom.path, slot);
+    if (saveFeedback[key] == 'Saving') return;
+    saveFeedback[key] = 'Saving';
     notifyListeners();
+    try {
+      final state = session.saveState();
+      if (state == null) throw StateError('No save state available');
+      await File(_slotPath(rom, slot)).writeAsBytes(state, flush: true);
+      saveFeedback[key] = 'Saved';
+      session.log('saved #$slot');
+    } catch (error) {
+      saveFeedback[key] = 'Save failed';
+      session.log('could not save #$slot: $error');
+    }
+    if (!_disposed) notifyListeners();
   }
 
   Future<void> loadState(int slot, {RomFile? from}) async {
