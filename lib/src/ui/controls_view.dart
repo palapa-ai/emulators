@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../controller_pairing.dart';
+import '../player_controls.dart';
 import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
@@ -11,14 +12,20 @@ class ControlsView extends StatelessWidget {
     required this.viewModel,
     this.skin,
     this.showTrainingData = true,
+    this.showPairing = true,
     this.onPairController,
+    this.onDriverChanged,
+    this.playerDetails,
     super.key,
   });
 
   final EmulatorViewModel viewModel;
   final EmulatorSkin? skin;
   final bool showTrainingData;
+  final bool showPairing;
   final VoidCallback? onPairController;
+  final ValueChanged<EmulatorPlayer>? onDriverChanged;
+  final Widget Function(EmulatorPlayer)? playerDetails;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -28,7 +35,6 @@ class ControlsView extends StatelessWidget {
   );
 
   Widget _content(BuildContext context, EmulatorSkin skin) {
-    final presses = viewModel.padLog;
     return skin.panel(
       context,
       title: '',
@@ -43,7 +49,7 @@ class ControlsView extends StatelessWidget {
             labelled: true,
             onTap: viewModel.toggleTrainingData,
           ),
-        if (viewModel.padName == null &&
+        if (showPairing && viewModel.padName == null &&
             (onPairController != null || ControllerPairing.canOpen))
           skin.button(
             context,
@@ -57,14 +63,23 @@ class ControlsView extends StatelessWidget {
         crossAxisAlignment: .stretch,
         mainAxisSize: .min,
         children: [
-          _ControllerLine(
-            skin: skin,
-            number: 1,
-            name: viewModel.padName,
-            presses: presses.map((press) => press.label).toList(),
-          ),
-          const SizedBox(height: 8),
-          _ControllerLine(skin: skin, number: 2, presses: const []),
+          for (final player in EmulatorPlayer.values) ...[
+            _ControllerLine(
+              skin: skin,
+              label: viewModel.controlsFor(player).label,
+              name: viewModel.padNameFor(player),
+              presses: viewModel
+                  .controlsFor(player)
+                  .history
+                  .map((b) => b.label)
+                  .toList(),
+              onToggle: onDriverChanged == null
+                  ? null
+                  : () => onDriverChanged?.call(player),
+            ),
+            if (playerDetails case final details?) details(player),
+            if (player != EmulatorPlayer.values.last) const SizedBox(height: 8),
+          ],
         ],
       ),
     );
@@ -74,34 +89,50 @@ class ControlsView extends StatelessWidget {
 class _ControllerLine extends StatelessWidget {
   const _ControllerLine({
     required this.skin,
-    required this.number,
+    required this.label,
+    this.onToggle,
     required this.presses,
     this.name,
   });
 
   final EmulatorSkin skin;
-  final int number;
+  final String label;
+  final VoidCallback? onToggle;
   final String? name;
   final List<String> presses;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 24,
+    height: 32,
     child: Row(
       children: [
         const EmulatorGlyph(EmulatorIcon.controller, size: 13),
         const SizedBox(width: 6),
-        skin.text(context, 'Controller #$number', role: .caption),
+        if (onToggle case final toggle?)
+          skin.button(
+            context,
+            label: label,
+            onTap: toggle,
+            preserveLabelCase: true,
+          )
+        else
+          skin.text(context, label, role: .caption),
         if (name case final value?) ...[
           const SizedBox(width: 8),
-          skin.text(context, value, role: .caption),
+          Flexible(
+            child: skin.text(context, value, role: .caption, maxLines: 1),
+          ),
         ],
         const SizedBox(width: 12),
         Expanded(
           child: presses.isEmpty
               ? Align(
                   alignment: Alignment.centerLeft,
-                  child: skin.text(context, 'Not connected', role: .caption),
+                  child: skin.text(
+                    context,
+                    name == null ? 'No input' : 'Connected',
+                    role: .caption,
+                  ),
                 )
               : ListView.separated(
                   scrollDirection: .horizontal,

@@ -8,6 +8,7 @@ import 'emulator.dart';
 import 'emulator_button.dart';
 import 'gamepad.dart';
 import 'pad_element.dart';
+import 'player_controls.dart';
 import 'rom_file.dart';
 
 /// [unavailable] is not something the user did — it means no native core was
@@ -32,7 +33,81 @@ enum EmulatorSpeed {
 /// libretro cores hold their state in globals, so one session exists at a
 /// time — [play] closes the previous one before opening another.
 class EmulatorSession extends ChangeNotifier {
-  EmulatorSession({this.corePath, this.preview = false});
+  EmulatorSession({this.corePath, this.preview = false}) {
+    for (final controls in _players.values) {
+      controls.addListener(_writePlayers);
+    }
+  }
+
+  final _players = {
+    for (final player in EmulatorPlayer.values) player: PlayerControls(player),
+  };
+  PlayerControls controlsFor(EmulatorPlayer player) => _players[player]!;
+
+  int _inputRevision = 0;
+  int get inputRevision => _inputRevision;
+  final _aiFrames = <EmulatorPlayer, int>{};
+
+  void assignPlayer(EmulatorPlayer player, ControllerDriver driver) {
+    if (controlsFor(player).driver == driver) return;
+    _inputRevision++;
+    _aiFrames.remove(player);
+    if (player == .p1) {
+      _keyboard = 0;
+    } else {
+      _secondKeyboard = 0;
+    }
+    controlsFor(player).assign(driver);
+  }
+
+  /// An AI action belongs to the exact game/ownership revision observed.
+  bool applyAi(
+    EmulatorPlayer player,
+    int mask, {
+    required int revision,
+    int frames = 8,
+  }) {
+    if (revision != inputRevision ||
+        !isRunning ||
+        isPaused ||
+        controlsFor(player).driver != .ai ||
+        frames < 1 ||
+        frames > 60)
+      return false;
+    _aiFrames[player] = frames;
+    controlsFor(player).update(.ai, mask);
+    return true;
+  }
+
+  void releaseAi() {
+    _inputRevision++;
+    _aiFrames.clear();
+    for (final controls in _players.values) {
+      if (controls.driver == .ai) controls.release();
+    }
+  }
+
+  void _invalidateInput() {
+    _inputRevision++;
+    _aiFrames.clear();
+    _keyboard = _secondKeyboard = _held = 0;
+    for (final controls in _players.values) {
+      controls.release();
+    }
+  }
+
+  void _writePlayers() {
+    for (final controls in _players.values) {
+      for (final button in EmulatorButton.values) {
+        _emulator?.setButton(
+          button,
+          player: controls.player,
+          pressed: controls.held & (1 << button.id) != 0,
+        );
+      }
+    }
+    notifyListeners();
+  }
 
   /// A preview runs far below full rate and never makes a sound: eight of
   /// these at 60fps would spend the whole machine on pictures nobody is
@@ -53,6 +128,10 @@ class EmulatorSession extends ChangeNotifier {
   bool _decoding = false;
 
   final _gamepad = Gamepad.open();
+  final _secondGamepad = Gamepad.open(player: .p2);
+  int _secondKeyboard = 0;
+  String? padNameFor(EmulatorPlayer player) =>
+      player == .p1 ? _gamepad.name : _secondGamepad.name;
   final _log = <String>[];
   final _buttonLog = <EmulatorButton>[];
   final _padLog = <PadElement>[];
@@ -217,9 +296,14 @@ class EmulatorSession extends ChangeNotifier {
   }
 
   void stop() {
+    _invalidateInput();
     _input?.cancel();
     _input = null;
     _keyboard = 0;
+    _secondKeyboard = 0;
+    for (final controls in _players.values) {
+      controls.reset();
+    }
     _lastHeld = 0;
     _lastRaw = 0;
     _buttonLog.clear();
@@ -259,6 +343,7 @@ class EmulatorSession extends ChangeNotifier {
   void pause() {
     if (_emulator == null || _paused) return;
     _paused = true;
+    _invalidateInput();
     _emulator?.stopAudio();
     log('paused');
     notifyListeners();
@@ -296,6 +381,7 @@ class EmulatorSession extends ChangeNotifier {
   }
 
   bool loadState(Uint8List state) {
+    _invalidateInput();
     final ok = _emulator?.loadState(state) ?? false;
     if (!ok) log('load failed');
     return ok;
@@ -305,15 +391,30 @@ class EmulatorSession extends ChangeNotifier {
       _emulator?.setAudioQuality(bits: bits, mono: mono);
 
   void reset() {
+    _invalidateInput();
+    for (final controls in _players.values) {
+      controls.reset();
+    }
     _emulator?.reset();
     log('reset');
   }
 
   /// Held keys are remembered rather than pushed straight through, because
   /// the pad is polled every frame and would otherwise clear them.
-  void press(EmulatorButton button, {required bool pressed}) {
+  void press(
+    EmulatorButton button, {
+    required bool pressed,
+    EmulatorPlayer player = .p1,
+  }) {
     final bit = 1 << button.id;
-    _keyboard = pressed ? _keyboard | bit : _keyboard & ~bit;
+    if (player == .p1) {
+      _keyboard = pressed ? _keyboard | bit : _keyboard & ~bit;
+    } else {
+      _secondKeyboard = pressed
+          ? _secondKeyboard | bit
+          : _secondKeyboard & ~bit;
+    }
+    _applyInput();
   }
 
   int _held = 0;
@@ -324,13 +425,18 @@ class EmulatorSession extends ChangeNotifier {
   int get keyboardMask => _keyboard;
 
   void _applyInput() {
-    final held = _keyboard | _gamepad.pressed;
+    if (!isRunning || isPaused) return;
+    controlsFor(
+      .p1,
+    ).update(.human, _keyboard | _gamepad.pressed, record: _collecting);
+    controlsFor(.p2).update(
+      .human,
+      _secondKeyboard | _secondGamepad.pressed,
+      record: _collecting,
+    );
+    final held = controlsFor(.p1).held;
     final changed = held != _held;
     _held = held;
-
-    for (final button in EmulatorButton.values) {
-      _emulator?.setButton(button, pressed: held >> button.id & 1 == 1);
-    }
 
     if (changed) notifyListeners();
 
@@ -386,6 +492,15 @@ class EmulatorSession extends ChangeNotifier {
     _decoding = true;
     try {
       emulator.runFrame();
+      for (final player in _aiFrames.keys.toList()) {
+        final remaining = _aiFrames[player]! - 1;
+        if (remaining <= 0) {
+          _aiFrames.remove(player);
+          controlsFor(player).release();
+        } else {
+          _aiFrames[player] = remaining;
+        }
+      }
 
       final pixels = emulator.frame;
       final width = emulator.frameWidth;
@@ -426,6 +541,10 @@ class EmulatorSession extends ChangeNotifier {
   @override
   void dispose() {
     stop();
+    for (final controls in _players.values) {
+      controls.removeListener(_writePlayers);
+      controls.dispose();
+    }
     frames.dispose();
     super.dispose();
   }

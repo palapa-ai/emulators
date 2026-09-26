@@ -25,8 +25,18 @@ private enum Element {
   static let dpad = "Direction Pad"
 }
 
-private func firstController() -> GCController? {
-  GCController.controllers().first
+private func controllerAt(_ port: Int32) -> GCController? {
+  guard port >= 0 && port < 2 else { return nil }
+  let controllers = GCController.controllers()
+  for controller in controllers where controller.playerIndex == .indexUnset {
+    for index in [GCControllerPlayerIndex.index1, .index2] {
+      if !controllers.contains(where: { $0.playerIndex == index }) {
+        controller.playerIndex = index
+        break
+      }
+    }
+  }
+  return controllers.first { $0.playerIndex.rawValue == Int(port) }
 }
 
 @available(macOS 11.0, *)
@@ -39,8 +49,11 @@ private func genericProfile(_ controller: GCController) -> GCPhysicalInputProfil
 /// once here rather than guessed from per-device indices: the bottom face
 /// button is B and the right one is A, the reverse of the Xbox naming.
 @_cdecl("emu_gamepad_buttons")
-public func emu_gamepad_buttons() -> UInt32 {
-  guard let controller = firstController() else { return 0 }
+public func emu_gamepad_buttons() -> UInt32 { emu_gamepad_buttons_for_player(0) }
+
+@_cdecl("emu_gamepad_buttons_for_player")
+public func emu_gamepad_buttons_for_player(_ port: Int32) -> UInt32 {
+  guard let controller = controllerAt(port) else { return 0 }
 
   var mask: UInt32 = 0
 
@@ -103,8 +116,11 @@ public func emu_gamepad_buttons() -> UInt32 {
 /// Bit order matches PadElement on the Dart side. Raw physical elements, not
 /// the SNES mapping — this is what a remapping UI has to show.
 @_cdecl("emu_gamepad_raw")
-public func emu_gamepad_raw() -> UInt32 {
-  guard let controller = firstController() else { return 0 }
+public func emu_gamepad_raw() -> UInt32 { emu_gamepad_raw_for_player(0) }
+
+@_cdecl("emu_gamepad_raw_for_player")
+public func emu_gamepad_raw_for_player(_ port: Int32) -> UInt32 {
+  guard let controller = controllerAt(port) else { return 0 }
 
   var mask: UInt32 = 0
   var bit: UInt32 = 0
@@ -164,8 +180,11 @@ public func emu_gamepad_raw() -> UInt32 {
 }
 
 @_cdecl("emu_gamepad_connected")
-public func emu_gamepad_connected() -> Int32 {
-  guard let controller = firstController() else { return 0 }
+public func emu_gamepad_connected() -> Int32 { emu_gamepad_connected_for_player(0) }
+
+@_cdecl("emu_gamepad_connected_for_player")
+public func emu_gamepad_connected_for_player(_ port: Int32) -> Int32 {
+  guard let controller = controllerAt(port) else { return 0 }
   if controller.extendedGamepad != nil { return 1 }
   if #available(macOS 11.0, *) { return genericProfile(controller) != nil ? 1 : 0 }
   return 0
@@ -176,8 +195,11 @@ private var nameBuffer: UnsafeMutablePointer<CChar>?
 /// Owned by this module and replaced on each call, so callers may read it but
 /// must not free it.
 @_cdecl("emu_gamepad_name")
-public func emu_gamepad_name() -> UnsafePointer<CChar>? {
-  guard let controller = firstController() else { return nil }
+public func emu_gamepad_name() -> UnsafePointer<CChar>? { emu_gamepad_name_for_player(0) }
+
+@_cdecl("emu_gamepad_name_for_player")
+public func emu_gamepad_name_for_player(_ port: Int32) -> UnsafePointer<CChar>? {
+  guard let controller = controllerAt(port) else { return nil }
 
   nameBuffer.map { free($0) }
   // The profile is part of the name because it is the difference between a
