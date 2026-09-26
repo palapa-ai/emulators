@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:common_mvvm/common_mvvm.dart' as mvvm;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -8,6 +9,7 @@ import '../controller_pairing.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import '../rom_file.dart';
+import 'emulator_preview_view_model.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 import 'state_slots.dart';
@@ -471,27 +473,31 @@ class _Idle extends StatelessWidget {
   }
 }
 
-/// A cartridge's own picture: the frame it was photographed on, or the one
-/// the player is looking at when it is the game on the screen.
-class _Preview extends StatelessWidget {
-  const _Preview({required this.viewModel, required this.rom});
+class _Preview extends mvvm.View<EmulatorPreviewViewModel> {
+  _Preview({required EmulatorViewModel viewModel, required this.rom})
+    : console = viewModel,
+      super(() => EmulatorPreviewViewModel(viewModel, rom));
 
-  final EmulatorViewModel viewModel;
+  final EmulatorViewModel console;
   final RomFile rom;
 
   @override
+  void updateViewModel(EmulatorPreviewViewModel viewModel) =>
+      viewModel.update(console, rom);
+
+  @override
   Widget build(BuildContext context) {
-    final live = viewModel.playing == rom ? viewModel.session.frames : null;
+    final live = viewModel.session;
     if (live == null) {
-      return _Picture(viewModel: viewModel, image: viewModel.pictureOf(rom));
+      return _Picture(viewModel: console, image: console.pictureOf(rom));
     }
 
     return RepaintBoundary(
       child: ValueListenableBuilder<ui.Image?>(
-        valueListenable: live,
+        valueListenable: live.frames,
         builder: (context, frame, _) => _Picture(
-          viewModel: viewModel,
-          image: frame ?? viewModel.pictureOf(rom),
+          viewModel: console,
+          image: frame ?? console.pictureOf(rom),
         ),
       ),
     );
