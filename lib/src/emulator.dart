@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'emulator_button.dart';
 import 'libretro_bindings.dart';
 import 'native_memory.dart';
+import 'player_controls.dart';
 
 class EmulatorException implements Exception {
   EmulatorException(this.message);
@@ -92,8 +93,16 @@ class Emulator {
   void setAudioQuality({required int bits, required bool mono}) =>
       _bindings.audioSetQuality(_session, bits, mono ? 1 : 0);
 
-  void setButton(EmulatorButton button, {required bool pressed}) =>
-      _bindings.setButton(_session, button.id, pressed ? 1 : 0);
+  void setButton(
+    EmulatorButton button, {
+    required bool pressed,
+    EmulatorPlayer player = .p1,
+  }) => _bindings.setPlayerButton(
+    _session,
+    player.port,
+    button.id,
+    pressed ? 1 : 0,
+  );
 
   /// The last rendered frame as ARGB8888. The returned view aliases native
   /// memory that the next [runFrame] overwrites — copy it to keep it.
