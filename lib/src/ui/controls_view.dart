@@ -49,7 +49,8 @@ class ControlsView extends StatelessWidget {
             labelled: true,
             onTap: viewModel.toggleTrainingData,
           ),
-        if (showPairing && viewModel.padName == null &&
+        if (showPairing &&
+            viewModel.padName == null &&
             (onPairController != null || ControllerPairing.canOpen))
           skin.button(
             context,
@@ -62,25 +63,28 @@ class ControlsView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: .stretch,
         mainAxisSize: .min,
-        children: [
-          for (final player in EmulatorPlayer.values) ...[
-            _ControllerLine(
-              skin: skin,
-              label: viewModel.controlsFor(player).label,
-              name: viewModel.padNameFor(player),
-              presses: viewModel
-                  .controlsFor(player)
-                  .history
-                  .map((b) => b.label)
-                  .toList(),
-              onToggle: onDriverChanged == null
-                  ? null
-                  : () => onDriverChanged?.call(player),
-            ),
-            if (playerDetails case final details?) details(player),
-            if (player != EmulatorPlayer.values.last) const SizedBox(height: 8),
-          ],
-        ],
+        children: EmulatorPlayer.values
+            .expand(
+              (player) => <Widget>[
+                _ControllerLine(
+                  skin: skin,
+                  label: viewModel.controlsFor(player).label,
+                  name: viewModel.padNameFor(player),
+                  presses: viewModel
+                      .controlsFor(player)
+                      .history
+                      .map((b) => b.label)
+                      .toList(),
+                  onToggle: onDriverChanged == null
+                      ? null
+                      : () => onDriverChanged?.call(player),
+                ),
+                if (playerDetails case final details?) details(player),
+                if (player != EmulatorPlayer.values.last)
+                  const SizedBox(height: 8),
+              ],
+            )
+            .toList(),
       ),
     );
   }

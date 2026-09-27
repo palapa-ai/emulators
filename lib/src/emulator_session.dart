@@ -34,14 +34,17 @@ enum EmulatorSpeed {
 /// time — [play] closes the previous one before opening another.
 class EmulatorSession extends ChangeNotifier {
   EmulatorSession({this.corePath, this.preview = false}) {
-    for (final controls in _players.values) {
+    _players.values.forEach((controls) {
       controls.addListener(_writePlayers);
-    }
+    });
   }
 
-  final _players = {
-    for (final player in EmulatorPlayer.values) player: PlayerControls(player),
-  };
+  final _players = Map.fromEntries(
+    EmulatorPlayer.values.map(
+      (player) => MapEntry(player, PlayerControls(player)),
+    ),
+  );
+
   PlayerControls controlsFor(EmulatorPlayer player) => _players[player]!;
 
   int _inputRevision = 0;
@@ -50,13 +53,16 @@ class EmulatorSession extends ChangeNotifier {
 
   void assignPlayer(EmulatorPlayer player, ControllerDriver driver) {
     if (controlsFor(player).driver == driver) return;
+
     _inputRevision++;
     _aiFrames.remove(player);
+
     if (player == .p1) {
       _keyboard = 0;
     } else {
       _secondKeyboard = 0;
     }
+
     controlsFor(player).assign(driver);
   }
 
@@ -74,6 +80,7 @@ class EmulatorSession extends ChangeNotifier {
         frames < 1 ||
         frames > 60)
       return false;
+
     _aiFrames[player] = frames;
     controlsFor(player).update(.ai, mask);
     return true;
@@ -82,30 +89,31 @@ class EmulatorSession extends ChangeNotifier {
   void releaseAi() {
     _inputRevision++;
     _aiFrames.clear();
-    for (final controls in _players.values) {
+    _players.values.forEach((controls) {
       if (controls.driver == .ai) controls.release();
-    }
+    });
   }
 
   void _invalidateInput() {
     _inputRevision++;
     _aiFrames.clear();
     _keyboard = _secondKeyboard = _held = 0;
-    for (final controls in _players.values) {
+    _players.values.forEach((controls) {
       controls.release();
-    }
+    });
   }
 
   void _writePlayers() {
-    for (final controls in _players.values) {
-      for (final button in EmulatorButton.values) {
+    _players.values.forEach((controls) {
+      EmulatorButton.values.forEach((button) {
         _emulator?.setButton(
           button,
           player: controls.player,
           pressed: controls.held & (1 << button.id) != 0,
         );
-      }
-    }
+      });
+    });
+
     notifyListeners();
   }
 
@@ -301,9 +309,9 @@ class EmulatorSession extends ChangeNotifier {
     _input = null;
     _keyboard = 0;
     _secondKeyboard = 0;
-    for (final controls in _players.values) {
+    _players.values.forEach((controls) {
       controls.reset();
-    }
+    });
     _lastHeld = 0;
     _lastRaw = 0;
     _buttonLog.clear();
@@ -392,9 +400,9 @@ class EmulatorSession extends ChangeNotifier {
 
   void reset() {
     _invalidateInput();
-    for (final controls in _players.values) {
+    _players.values.forEach((controls) {
       controls.reset();
-    }
+    });
     _emulator?.reset();
     log('reset');
   }
@@ -492,15 +500,17 @@ class EmulatorSession extends ChangeNotifier {
     _decoding = true;
     try {
       emulator.runFrame();
-      for (final player in _aiFrames.keys.toList()) {
+
+      _aiFrames.keys.toList().forEach((player) {
         final remaining = _aiFrames[player]! - 1;
+
         if (remaining <= 0) {
           _aiFrames.remove(player);
           controlsFor(player).release();
         } else {
           _aiFrames[player] = remaining;
         }
-      }
+      });
 
       final pixels = emulator.frame;
       final width = emulator.frameWidth;
@@ -541,10 +551,10 @@ class EmulatorSession extends ChangeNotifier {
   @override
   void dispose() {
     stop();
-    for (final controls in _players.values) {
+    _players.values.forEach((controls) {
       controls.removeListener(_writePlayers);
       controls.dispose();
-    }
+    });
     frames.dispose();
     super.dispose();
   }

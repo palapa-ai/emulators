@@ -7,6 +7,7 @@ enum EmulatorPlayer {
   p2(1, 'P2');
 
   const EmulatorPlayer(this.port, this.label);
+
   final int port;
   final String label;
 }
@@ -16,6 +17,7 @@ enum ControllerDriver {
   ai('AI');
 
   const ControllerDriver(this.label);
+
   final String label;
 }
 
@@ -34,6 +36,7 @@ class PlayerControls extends ChangeNotifier {
 
   void assign(ControllerDriver driver) {
     if (_driver == driver) return;
+
     _driver = driver;
     _held = 0;
     _history.clear();
@@ -42,16 +45,20 @@ class PlayerControls extends ChangeNotifier {
 
   void update(ControllerDriver source, int mask, {bool record = true}) {
     if (source != driver) return;
+
     final valid = mask & ((1 << EmulatorButton.values.length) - 1);
     if (_held == valid) return;
+
     final pressed = valid & ~_held;
     _held = valid;
+
     if (record) {
       _history.addAll(
         EmulatorButton.values.where((b) => pressed & (1 << b.id) != 0),
       );
       if (_history.length > 120) _history.removeRange(0, _history.length - 120);
     }
+
     notifyListeners();
   }
 
