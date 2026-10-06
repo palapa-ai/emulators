@@ -1,7 +1,9 @@
 #version 460 core
 #include <flutter/runtime_effect.glsl>
 
-precision mediump float;
+// Field/noise seeds exceed half-float precision quickly on GLES drivers.
+// Keep the same shader and precision on every renderer.
+precision highp float;
 
 uniform vec2 uSize;
 uniform float uTime;
@@ -42,7 +44,7 @@ void main() {
 
   // Head switching: the drum leaves the tape near the bottom, so the last
   // few lines tear sideways and lose sync.
-  float switchZone = smoothstep(0.035, 0.0, 1.0 - uv.y);
+  float switchZone = 1.0 - smoothstep(0.0, 0.035, 1.0 - uv.y);
   float tear = (hash(vec2(field, line)) - 0.5) * switchZone * 0.05;
 
   // Time-base error. A capstan cannot hold a line to the microsecond, so each
@@ -54,7 +56,7 @@ void main() {
                + sin(uv.y * 43.0 - uTime * 2.9) * 0.0005;
 
   float bandPos = fract(uTime * 0.11);
-  float band = smoothstep(0.05, 0.0, abs(uv.y - bandPos));
+  float band = 1.0 - smoothstep(0.0, 0.05, abs(uv.y - bandPos));
   wobble += band * (hash(vec2(line, field)) - 0.5) * 0.007;
 
   vec2 warped = vec2(clamp(uv.x + wobble + tear + jitter, 0.0, 1.0), uv.y);
@@ -138,7 +140,7 @@ void main() {
   color += (grain - 0.5) * 0.022 * (1.25 - dot(color, vec3(0.333)));
 
   // The switching band itself: noisy, desaturated, and brighter at the seam.
-  float seam = smoothstep(0.012, 0.0, 1.0 - uv.y);
+  float seam = 1.0 - smoothstep(0.0, 0.012, 1.0 - uv.y);
   float switchNoise = hash(vec2(floor(uv.x * uSize.x * 0.4), field * 3.0));
   color = mix(color, vec3(switchNoise), switchZone * 0.3);
   color = mix(color, vec3(0.75 + switchNoise * 0.25), seam * 0.45);
@@ -155,7 +157,7 @@ void main() {
     if (seed > 0.86) {
       float centre = hash1(seed * 17.0);
       float height = 0.004 + hash1(seed * 41.0) * 0.02;
-      float inBar = smoothstep(height, 0.0, abs(uv.y - centre));
+      float inBar = 1.0 - smoothstep(0.0, height, abs(uv.y - centre));
       float bar = hash(vec2(floor(uv.x * uSource.x * 0.7), floor(centre * 300.0) + field));
       color = mix(color, vec3(0.55 + bar * 0.45), inBar * 0.65);
     }
@@ -167,7 +169,8 @@ void main() {
 
   // Scanlines, then worn-head response: soft top end and a lifted black floor.
   color *= 1.0 - 0.05 * step(1.0, mod(floor(uv.y * uSize.y * 0.5), 2.0));
-  color = pow(color, vec3(0.95));
+  // Grain can push black slightly negative; fractional pow is undefined there.
+  color = pow(max(color, vec3(0.0)), vec3(0.95));
   color = color * 0.93 + 0.04;
   color *= vec3(1.03, 0.99, 1.02);
 

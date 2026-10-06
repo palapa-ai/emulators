@@ -1,8 +1,8 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 
 Future<void> main(List<String> arguments) async {
-  if (!Platform.isMacOS) throw UnsupportedError('Run on macOS.');
   final root = File.fromUri(Platform.script).parent.parent;
   final native = '${root.path}/macos/emulator_palapa/Sources/emulators_host';
   final header = await File('$native/include/libretro_host.h').readAsString();
@@ -12,6 +12,25 @@ Future<void> main(List<String> arguments) async {
       .whereType<String>()
       .toList();
   if (symbols.isEmpty) throw StateError('No native exports found.');
+
+  if (arguments case ['--app', final path] when Platform.isWindows) {
+    final library = DynamicLibrary.open('$path/emulators.dll');
+    final missing = symbols
+        .where((name) => !library.providesSymbol(name))
+        .toList();
+    if (missing.isNotEmpty) {
+      throw StateError('Missing emulator exports: ${missing.join(', ')}');
+    }
+    stdout.writeln(
+      'All ${symbols.length} emulator exports are present in the Windows app.',
+    );
+    return;
+  }
+  if (!Platform.isMacOS) {
+    throw ArgumentError(
+      'Usage on Windows: dart tool/check_native_exports.dart --app path/to/Palapa',
+    );
+  }
 
   if (arguments case ['--app', final path]) {
     final executable = '$path/Contents/MacOS/Palapa';
