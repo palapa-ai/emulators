@@ -1,15 +1,33 @@
 #include "libretro_host.h"
 
-#include <AudioToolbox/AudioToolbox.h>
-#include <dlfcn.h>
 #include <errno.h>
-#include <pthread.h>
 #include <stdarg.h>
+#ifdef _WIN32
+#define RETRO_API __cdecl
+#endif
 #include <libretro.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include "host_windows.h"
+#else
+#include <AudioToolbox/AudioToolbox.h>
+#include <dlfcn.h>
+#include <pthread.h>
+typedef pthread_mutex_t emu_mutex;
+#define emu_mutex_init(lock) pthread_mutex_init(lock, NULL)
+#define emu_mutex_lock pthread_mutex_lock
+#define emu_mutex_unlock pthread_mutex_unlock
+#define emu_mutex_destroy pthread_mutex_destroy
+#define emu_library_open(path) dlopen(path, RTLD_LAZY)
+#define emu_library_symbol dlsym
+#define emu_library_close dlclose
+#define emu_library_error dlerror
+#define emu_rom_open(path) fopen(path, "rb")
+#endif
 
 /* A quarter second of slack at SNES rates: enough that a late frame does not
    click, short enough that input does not lag behind the picture. */
@@ -48,8 +66,17 @@ struct EmuSession {
 
    int16_t *audio;
    int audio_read, audio_write;
-   pthread_mutex_t audio_lock;
+   emu_mutex audio_lock;
+#ifdef _WIN32
+   HWAVEOUT audio_queue;
+   HANDLE audio_event;
+   HANDLE audio_thread;
+   volatile LONG audio_stopping;
+   WAVEHDR audio_buffers[AUDIO_BUFFER_COUNT];
+   int16_t audio_samples[AUDIO_BUFFER_COUNT][AUDIO_BUFFER_FRAMES * 2];
+#else
    AudioQueueRef audio_queue;
+#endif
    int audio_muted;
    int audio_bits;
    int audio_mono;
@@ -225,7 +252,7 @@ static void push_audio(const int16_t *data, size_t frames)
    if (!active || active->audio_discard)
       return;
 
-   pthread_mutex_lock(&active->audio_lock);
+   emu_mutex_lock(&active->audio_lock);
 
    if (active->audio_bits >= 16 && !active->audio_mono)
    {
@@ -260,20 +287,21 @@ static void push_audio(const int16_t *data, size_t frames)
       }
    }
 
-   pthread_mutex_unlock(&active->audio_lock);
+   emu_mutex_unlock(&active->audio_lock);
 }
 
 /* Underrun plays silence rather than stalling the device — a gap is far less
    audible than the queue starving and restarting. */
+#ifndef _WIN32
 static void audio_callback(void *user, AudioQueueRef queue,
       AudioQueueBufferRef buffer)
 {
    EmuSession *s = user;
    int16_t *out = buffer->mAudioData;
 
-   pthread_mutex_lock(&s->audio_lock);
+   emu_mutex_lock(&s->audio_lock);
    int got = ring_read(s, out, AUDIO_BUFFER_FRAMES);
-   pthread_mutex_unlock(&s->audio_lock);
+   emu_mutex_unlock(&s->audio_lock);
 
    if (got < AUDIO_BUFFER_FRAMES)
       memset(out + (size_t)got * 2, 0,
@@ -285,6 +313,32 @@ static void audio_callback(void *user, AudioQueueRef queue,
    buffer->mAudioDataByteSize = AUDIO_BUFFER_FRAMES * 4;
    AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);
 }
+#else
+static DWORD WINAPI audio_thread(void *user)
+{
+   EmuSession *s = user;
+   while (WaitForSingleObject(s->audio_event, INFINITE) == WAIT_OBJECT_0)
+   {
+      if (InterlockedCompareExchange(&s->audio_stopping, 0, 0)) break;
+      for (int i = 0; i < AUDIO_BUFFER_COUNT; i++)
+      {
+         WAVEHDR *buffer = &s->audio_buffers[i];
+         if (!(buffer->dwFlags & WHDR_DONE)) continue;
+         int16_t *out = s->audio_samples[i];
+         emu_mutex_lock(&s->audio_lock);
+         int got = ring_read(s, out, AUDIO_BUFFER_FRAMES);
+         int muted = s->audio_muted;
+         emu_mutex_unlock(&s->audio_lock);
+         if (got < AUDIO_BUFFER_FRAMES)
+            memset(out + (size_t)got * 2, 0, (size_t)(AUDIO_BUFFER_FRAMES - got) * 4);
+         if (muted) memset(out, 0, AUDIO_BUFFER_FRAMES * 4);
+         if (waveOutWrite(s->audio_queue, buffer, sizeof(*buffer)) != MMSYSERR_NOERROR)
+            return 1;
+      }
+   }
+   return 0;
+}
+#endif
 
 static size_t cb_audio_batch(const int16_t *data, size_t frames)
 {
@@ -326,7 +380,7 @@ static int16_t cb_input_state(unsigned port, unsigned device, unsigned index,
 
 static void *sym(void *lib, const char *name)
 {
-   return dlsym(lib, name);
+   return emu_library_symbol(lib, name);
 }
 
 static void fail(char *err, size_t err_len, const char *fmt, ...)
@@ -354,10 +408,10 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    s->audio_bits = 16;
    snprintf(s->system_dir, sizeof(s->system_dir), ".");
 
-   s->lib = dlopen(core_path, RTLD_LAZY);
+   s->lib = emu_library_open(core_path);
    if (!s->lib)
    {
-      fail(err, err_len, dlerror());
+      fail(err, err_len, "%s", emu_library_error());
       free(s);
       return NULL;
    }
@@ -382,20 +436,24 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    s->get_memory_data        = sym(s->lib, "retro_get_memory_data");
    s->get_memory_size        = sym(s->lib, "retro_get_memory_size");
 
-   if (!s->init || !s->load_game || !s->run || !s->get_system_av_info)
+   if (!s->init || !s->deinit || !s->load_game || !s->run ||
+       !s->get_system_av_info || !s->get_system_info || !s->set_environment ||
+       !s->set_video_refresh || !s->set_audio_sample ||
+       !s->set_audio_sample_batch || !s->set_input_poll || !s->set_input_state)
    {
       fail(err, err_len, "not a libretro core: missing entry points");
-      dlclose(s->lib);
+      emu_library_close(s->lib);
       free(s);
       return NULL;
    }
 
-   pthread_mutex_init(&s->audio_lock, NULL);
+   emu_mutex_init(&s->audio_lock);
    s->audio = malloc((size_t)AUDIO_RING_FRAMES * 2 * sizeof(int16_t));
    if (!s->audio)
    {
       fail(err, err_len, "out of memory");
-      dlclose(s->lib);
+      emu_library_close(s->lib);
+      emu_mutex_destroy(&s->audio_lock);
       free(s);
       return NULL;
    }
@@ -410,7 +468,7 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    s->set_input_poll(cb_input_poll);
    s->set_input_state(cb_input_state);
 
-   FILE *f = fopen(rom_path, "rb");
+   FILE *f = emu_rom_open(rom_path);
    if (!f)
    {
       fail(err, err_len, "cannot open rom: %s (%s)", strerror(errno), rom_path);
@@ -461,7 +519,7 @@ void emu_close(EmuSession *s)
    if (s->deinit)
       s->deinit();
    if (s->lib)
-      dlclose(s->lib);
+      emu_library_close(s->lib);
 
    free(s->rom);
    free(s->pixels);
@@ -470,7 +528,7 @@ void emu_close(EmuSession *s)
    if (active == s)
       active = NULL;
 
-   pthread_mutex_destroy(&s->audio_lock);
+   emu_mutex_destroy(&s->audio_lock);
    free(s);
 }
 
@@ -492,9 +550,9 @@ int emu_audio_read(EmuSession *s, int16_t *out, int max_frames)
    if (!s || !out || max_frames <= 0)
       return 0;
 
-   pthread_mutex_lock(&s->audio_lock);
+   emu_mutex_lock(&s->audio_lock);
    int take = ring_read(s, out, max_frames);
-   pthread_mutex_unlock(&s->audio_lock);
+   emu_mutex_unlock(&s->audio_lock);
    return take;
 }
 
@@ -503,16 +561,20 @@ int emu_audio_queued(EmuSession *s)
    if (!s)
       return 0;
 
-   pthread_mutex_lock(&s->audio_lock);
+   emu_mutex_lock(&s->audio_lock);
    int filled = ring_filled(s);
-   pthread_mutex_unlock(&s->audio_lock);
+   emu_mutex_unlock(&s->audio_lock);
    return filled;
 }
 
 void emu_audio_set_muted(EmuSession *s, int muted)
 {
    if (s)
+   {
+      emu_mutex_lock(&s->audio_lock);
       s->audio_muted = muted ? 1 : 0;
+      emu_mutex_unlock(&s->audio_lock);
+   }
 }
 
 void emu_audio_set_quality(EmuSession *s, int bits, int mono)
@@ -520,10 +582,10 @@ void emu_audio_set_quality(EmuSession *s, int bits, int mono)
    if (!s)
       return;
 
-   pthread_mutex_lock(&s->audio_lock);
+   emu_mutex_lock(&s->audio_lock);
    s->audio_bits = bits;
    s->audio_mono = mono ? 1 : 0;
-   pthread_mutex_unlock(&s->audio_lock);
+   emu_mutex_unlock(&s->audio_lock);
 }
 
 void emu_audio_set_discard(EmuSession *s, int discard)
@@ -531,11 +593,11 @@ void emu_audio_set_discard(EmuSession *s, int discard)
    if (!s)
       return;
 
-   pthread_mutex_lock(&s->audio_lock);
+   emu_mutex_lock(&s->audio_lock);
    s->audio_discard = discard ? 1 : 0;
    if (s->audio_discard)
       s->audio_read = s->audio_write;
-   pthread_mutex_unlock(&s->audio_lock);
+   emu_mutex_unlock(&s->audio_lock);
 }
 
 int emu_audio_muted(EmuSession *s)
@@ -548,6 +610,48 @@ int emu_audio_start(EmuSession *s)
    if (!s || s->audio_queue)
       return s ? 0 : 1;
 
+#ifdef _WIN32
+   WAVEFORMATEX format = {0};
+   format.wFormatTag = WAVE_FORMAT_PCM;
+   format.nSamplesPerSec = (DWORD)(s->av.timing.sample_rate > 0
+         ? s->av.timing.sample_rate : 32040.0);
+   format.nChannels = 2;
+   format.wBitsPerSample = 16;
+   format.nBlockAlign = 4;
+   format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
+   s->audio_event = CreateEventW(NULL, FALSE, FALSE, NULL);
+   if (!s->audio_event) return 1;
+   if (waveOutOpen(&s->audio_queue, WAVE_MAPPER, &format,
+         (DWORD_PTR)s->audio_event, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR)
+   {
+      CloseHandle(s->audio_event);
+      s->audio_event = NULL;
+      s->audio_queue = NULL;
+      return 1;
+   }
+   InterlockedExchange(&s->audio_stopping, 0);
+   memset(s->audio_buffers, 0, sizeof(s->audio_buffers));
+   memset(s->audio_samples, 0, sizeof(s->audio_samples));
+   for (int i = 0; i < AUDIO_BUFFER_COUNT; i++)
+   {
+      WAVEHDR *buffer = &s->audio_buffers[i];
+      buffer->lpData = (LPSTR)s->audio_samples[i];
+      buffer->dwBufferLength = AUDIO_BUFFER_FRAMES * 4;
+      if (waveOutPrepareHeader(s->audio_queue, buffer, sizeof(*buffer)) != MMSYSERR_NOERROR ||
+          waveOutWrite(s->audio_queue, buffer, sizeof(*buffer)) != MMSYSERR_NOERROR)
+      {
+         emu_audio_stop(s);
+         return 1;
+      }
+   }
+   s->audio_thread = CreateThread(NULL, 0, audio_thread, s, 0, NULL);
+   if (!s->audio_thread)
+   {
+      emu_audio_stop(s);
+      return 1;
+   }
+   return 0;
+#else
    AudioStreamBasicDescription format = {
       .mSampleRate = s->av.timing.sample_rate > 0
             ? s->av.timing.sample_rate : 32040.0,
@@ -581,6 +685,7 @@ int emu_audio_start(EmuSession *s)
    }
 
    return AudioQueueStart(s->audio_queue, NULL) == noErr ? 0 : 1;
+#endif
 }
 
 void emu_audio_stop(EmuSession *s)
@@ -588,8 +693,26 @@ void emu_audio_stop(EmuSession *s)
    if (!s || !s->audio_queue)
       return;
 
+#ifdef _WIN32
+   InterlockedExchange(&s->audio_stopping, 1);
+   SetEvent(s->audio_event);
+   if (s->audio_thread)
+   {
+      WaitForSingleObject(s->audio_thread, INFINITE);
+      CloseHandle(s->audio_thread);
+      s->audio_thread = NULL;
+   }
+   waveOutReset(s->audio_queue);
+   for (int i = 0; i < AUDIO_BUFFER_COUNT; i++)
+      if (s->audio_buffers[i].dwFlags & WHDR_PREPARED)
+         waveOutUnprepareHeader(s->audio_queue, &s->audio_buffers[i], sizeof(WAVEHDR));
+   waveOutClose(s->audio_queue);
+   CloseHandle(s->audio_event);
+   s->audio_event = NULL;
+#else
    AudioQueueStop(s->audio_queue, true);
    AudioQueueDispose(s->audio_queue, true);
+#endif
    s->audio_queue = NULL;
 }
 

@@ -81,7 +81,7 @@ class RomFile {
   /// Dump filenames carry release cruft — region codes, revisions and dump
   /// flags — that nobody wants to read off a shelf.
   static String titleFor(String path) {
-    final name = path.split(Platform.pathSeparator).last;
+    final name = File(path).uri.pathSegments.last;
     final dot = name.lastIndexOf('.');
     final stem = dot == -1 ? name : name.substring(0, dot);
 
@@ -94,7 +94,7 @@ class RomFile {
 
   RomSystem? get system => RomSystem.of(path);
 
-  String get fileName => path.split(Platform.pathSeparator).last;
+  String get fileName => File(path).uri.pathSegments.last;
 
   String get sizeLabel => sizeBytes >= 1048576
       ? '${(sizeBytes / 1048576).toStringAsFixed(1)} MB'

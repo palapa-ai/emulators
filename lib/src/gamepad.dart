@@ -11,7 +11,7 @@ typedef _Connected = int Function(int);
 typedef _NameNative = Pointer<Utf8> Function(Int32);
 typedef _Name = Pointer<Utf8> Function(int);
 
-/// Reads a physical pad through Apple's GameController framework.
+/// Reads a physical pad through GameController or Windows XInput.
 ///
 /// The mapping lives on the Swift side, which names buttons by position, so
 /// nothing here has to guess what index a given device reports.
@@ -21,12 +21,16 @@ class Gamepad {
   final EmulatorPlayer player;
 
   factory Gamepad.open({EmulatorPlayer player = .p1}) {
-    if (!Platform.isMacOS && !Platform.isIOS) {
+    if (!Platform.isMacOS && !Platform.isIOS && !Platform.isWindows) {
       return Gamepad._(player, null, null, null, null);
     }
 
-    final lib = DynamicLibrary.process();
     try {
+      final lib = Platform.isWindows
+          ? DynamicLibrary.open(
+              '${File(Platform.resolvedExecutable).parent.path}\\emulators.dll',
+            )
+          : DynamicLibrary.process();
       return Gamepad._(
         player,
         lib.lookupFunction<_ButtonsNative, _Buttons>(
