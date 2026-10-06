@@ -41,6 +41,7 @@ struct EmuSession {
    size_t (*get_memory_size)(unsigned);
 
    void *rom;
+   bool game_loaded;
    unsigned pixel_format;
 
    uint32_t *pixels;
@@ -410,12 +411,46 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    s->set_input_poll(cb_input_poll);
    s->set_input_state(cb_input_state);
 
+   if (!emu_load_rom(s, rom_path, err, err_len))
+   {
+      emu_close(s);
+      return NULL;
+   }
+   return s;
+}
+
+void emu_unload_rom(EmuSession *s)
+{
+   if (!s)
+      return;
+   emu_audio_stop(s);
+   active = s;
+   if (s->game_loaded && s->unload_game)
+      s->unload_game();
+   s->game_loaded = false;
+   free(s->rom);
+   s->rom = NULL;
+   free(s->pixels);
+   s->pixels = NULL;
+   s->frame_w = s->frame_h = s->pixel_capacity = 0;
+   memset(s->buttons, 0, sizeof(s->buttons));
+   s->last_input_mask = 0;
+   pthread_mutex_lock(&s->audio_lock);
+   s->audio_read = s->audio_write = 0;
+   pthread_mutex_unlock(&s->audio_lock);
+}
+
+int emu_load_rom(EmuSession *s, const char *rom_path,
+      char *err, size_t err_len)
+{
+   if (!s)
+      return 0;
+   emu_unload_rom(s);
    FILE *f = fopen(rom_path, "rb");
    if (!f)
    {
       fail(err, err_len, "cannot open rom: %s (%s)", strerror(errno), rom_path);
-      emu_close(s);
-      return NULL;
+      return 0;
    }
 
    fseek(f, 0, SEEK_END);
@@ -427,8 +462,8 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    {
       fclose(f);
       fail(err, err_len, "cannot read rom");
-      emu_close(s);
-      return NULL;
+      emu_unload_rom(s);
+      return 0;
    }
 
    fclose(f);
@@ -439,13 +474,14 @@ EmuSession *emu_open(const char *core_path, const char *rom_path,
    if (!s->load_game(&game))
    {
       fail(err, err_len, "core rejected the rom");
-      emu_close(s);
-      return NULL;
+      emu_unload_rom(s);
+      return 0;
    }
 
+   s->game_loaded = true;
    s->get_system_info(&s->info);
    s->get_system_av_info(&s->av);
-   return s;
+   return 1;
 }
 
 void emu_close(EmuSession *s)
@@ -453,11 +489,7 @@ void emu_close(EmuSession *s)
    if (!s)
       return;
 
-   emu_audio_stop(s);
-
-   active = s;
-   if (s->unload_game)
-      s->unload_game();
+   emu_unload_rom(s);
    if (s->deinit)
       s->deinit();
    if (s->lib)
@@ -476,7 +508,7 @@ void emu_close(EmuSession *s)
 
 void emu_run_frame(EmuSession *s)
 {
-   if (!s || !s->run)
+   if (!s || !s->game_loaded || !s->run)
       return;
 
    active = s;

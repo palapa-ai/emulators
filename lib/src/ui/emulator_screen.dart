@@ -5,15 +5,16 @@ import 'package:common_mvvm/common_mvvm.dart' as mvvm;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import '../controller_pairing.dart';
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import '../rom_file.dart';
 import 'emulator_preview_view_model.dart';
 import 'emulator_skin.dart';
+import 'emulator_transport.dart';
 import 'emulator_view_model.dart';
 import 'state_slots.dart';
 import 'style_shader_view.dart';
+import 'widget_layout.dart';
 
 /// Which key stands for which button. Public because "what are the
 /// controls" is a question the screen has to be able to answer.
@@ -154,7 +155,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             showPixelShape: widget.showPixelShape,
             showTrainingData: widget.showTrainingData,
             showFullscreen: widget.showFullscreen,
-            onFullscreen: () => _setFullscreen(!viewModel.fullscreen),
+            onFullscreen: widget.onFullscreen,
             onPairController: widget.onPairController,
             transportLeading: viewModel.fullscreen
                 ? null
@@ -175,7 +176,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             child: Column(
               crossAxisAlignment: .stretch,
               children: [
-                Expanded(child: stage),
+                stage.expanded(),
                 if (widget.showShelf) ...[
                   const SizedBox(height: 16),
                   EmulatorShelf(viewModel: viewModel, skin: skin),
@@ -194,7 +195,7 @@ class _Stage extends StatelessWidget {
     required this.viewModel,
     required this.skin,
     required this.immersive,
-    required this.onFullscreen,
+    this.onFullscreen,
     this.showTransport = true,
     this.showPixelShape = false,
     this.showTrainingData = true,
@@ -210,10 +211,8 @@ class _Stage extends StatelessWidget {
   final bool showTransport;
   final bool showPixelShape;
   final bool showTrainingData;
-
-  /// Hosts with a fullscreen header action hide the transport copy.
   final bool showFullscreen;
-  final VoidCallback onFullscreen;
+  final ValueChanged<bool>? onFullscreen;
   final VoidCallback? onPairController;
   final Widget? transportLeading;
   final Widget? transportTrailing;
@@ -224,7 +223,16 @@ class _Stage extends StatelessWidget {
     if (rom == null) return _Idle(viewModel: viewModel, skin: skin);
 
     final picture = _picture(context);
-    final transport = _transport(context);
+    final transport = EmulatorTransport(
+      viewModel: viewModel,
+      showTrainingData: showTrainingData,
+      showPixelShape: showPixelShape,
+      showFullscreen: showFullscreen,
+      onPairController: onPairController,
+      onFullscreen: onFullscreen,
+      leading: transportLeading,
+      trailing: transportTrailing,
+    );
 
     return showTransport || immersive
         ? _Immersive(picture: picture, transport: transport)
@@ -249,128 +257,21 @@ class _Stage extends StatelessWidget {
             valueListenable: session.frames,
             // The stage fills whatever room it is given, but the picture
             // keeps the shape the console drew it in.
-            builder: (context, frame, _) => Center(
-              child: switch ((frame, viewModel.style)) {
-                (null, _) => const SizedBox.expand(),
-                (final frame?, final style?) => AspectRatio(
-                  aspectRatio: viewModel.aspectFor(frame.width, frame.height),
-                  child: StyleShaderView(frame: frame, style: style),
-                ),
-                (final frame?, null) => AspectRatio(
-                  aspectRatio: viewModel.aspectFor(frame.width, frame.height),
-                  child: RawImage(
-                    image: frame,
-                    fit: .fill,
-                    filterQuality: .none,
-                  ),
-                ),
-              },
-            ),
+            builder: (context, frame, _) => (switch ((frame, viewModel.style)) {
+              (null, _) => const SizedBox.expand(),
+              (final frame?, final style?) => AspectRatio(
+                aspectRatio: viewModel.aspectFor(frame.width, frame.height),
+                child: StyleShaderView(frame: frame, style: style),
+              ),
+              (final frame?, null) => AspectRatio(
+                aspectRatio: viewModel.aspectFor(frame.width, frame.height),
+                child: RawImage(image: frame, fit: .fill, filterQuality: .none),
+              ),
+            }).centered(),
           ),
         ),
       ),
     ).clickable;
-  }
-
-  Widget _transport(BuildContext context) {
-    final controls = <Widget>[
-      // The pad and the slots lead: they belong to the cartridge, while
-      // everything to the right of the gap belongs to the picture.
-      if (onPairController != null ||
-          (viewModel.gamepadName == null && ControllerPairing.canOpen)) ...[
-        skin.button(
-          context,
-          label: viewModel.gamepadName ?? 'Connect controller',
-          icon: .controller,
-          onTap: onPairController ?? ControllerPairing.open,
-        ),
-        const SizedBox(width: 16),
-      ],
-      if (transportLeading != null) transportLeading ?? const SizedBox(),
-      if (showTrainingData) ...[
-        skin.button(
-          context,
-          label: viewModel.sharesTrainingData
-              ? 'sharing training data'
-              : 'not sharing training data',
-          icon: viewModel.sharesTrainingData ? .training : .trainingOff,
-          onTap: viewModel.toggleTrainingData,
-        ),
-        const SizedBox(width: 8),
-      ],
-      skin.hint(
-        context,
-        'Display filter: ${viewModel.style?.label ?? 'Raw'}',
-        skin.button(
-          context,
-          label: viewModel.style?.label ?? 'Raw',
-          icon: .filter,
-          labelled: true,
-          onTap: viewModel.cycleStyle,
-          onSecondaryTap: () => viewModel.cycleStyle(reverse: true),
-        ),
-      ),
-      const SizedBox(width: 8),
-      if (showPixelShape) ...[
-        skin.button(
-          context,
-          label: viewModel.squarePixels ? '1:1' : '4:3',
-          onTap: viewModel.togglePixelShape,
-        ),
-        const SizedBox(width: 8),
-      ],
-      skin.button(
-        context,
-        label: viewModel.speed.label,
-        onTap: viewModel.cycleSpeed,
-        onSecondaryTap: () => viewModel.cycleSpeed(reverse: true),
-      ),
-      const SizedBox(width: 8),
-      // Beside the speed it governs: at 1x that button is a play triangle,
-      // and the two reading as a pair is the point.
-      skin.button(
-        context,
-        label: viewModel.isPaused ? 'Resume' : 'Pause',
-        icon: viewModel.isPaused ? .play : .pause,
-        onTap: viewModel.togglePause,
-      ),
-      const SizedBox(width: 8),
-      skin.button(
-        context,
-        label: 'Reset',
-        icon: .reset,
-        onTap: viewModel.reset,
-      ),
-      if (transportTrailing != null) ...[
-        const SizedBox(width: 8),
-        transportTrailing ?? const SizedBox(),
-      ],
-      const SizedBox(width: 8),
-      if (showFullscreen)
-        skin.button(
-          context,
-          label: immersive ? 'Leave fullscreen' : 'Fullscreen',
-          icon: immersive ? .fullscreenExit : .fullscreen,
-          onTap: onFullscreen,
-        ),
-    ];
-    return Row(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(mainAxisSize: MainAxisSize.min, children: controls),
-          ),
-        ),
-        const SizedBox(width: 8),
-        skin.button(
-          context,
-          label: viewModel.isMuted ? 'Unmute' : 'Mute',
-          icon: viewModel.isMuted ? .muted : .sound,
-          onTap: viewModel.toggleMuted,
-        ),
-      ],
-    );
   }
 }
 
@@ -462,7 +363,7 @@ class _Idle extends StatelessWidget {
       _ => 'Pick a game',
     };
 
-    return Center(child: skin.text(context, message, role: .caption));
+    return skin.text(context, message, role: .caption).centered();
   }
 }
 
@@ -558,13 +459,9 @@ class EmulatorShelf extends StatelessWidget {
             if (roms.isEmpty) {
               return SizedBox(
                 height: rowHeight,
-                child: Center(
-                  child: skin.text(
-                    context,
-                    'No cartridges yet',
-                    role: .caption,
-                  ),
-                ),
+                child: skin
+                    .text(context, 'No cartridges yet', role: .caption)
+                    .centered(),
               );
             }
             return GridView.builder(

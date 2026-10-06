@@ -38,14 +38,16 @@ class _Console extends EmulatorViewModel {
   @override
   bool hasState(RomFile rom, int slot) => slot == 1;
   @override
-  Future<void> saveState(int slot) async {
+  Future<bool> saveState(int slot) async {
     saved = slot;
+    return true;
   }
 
   @override
-  Future<void> loadState(int slot, {RomFile? from}) async {
+  Future<bool> loadState(int slot, {RomFile? from}) async {
     loaded = slot;
     loadedFrom = from;
+    return true;
   }
 
   @override

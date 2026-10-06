@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../rom_file.dart';
 import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
+import 'widget_layout.dart';
 
 /// Three save slots and three load slots, beside the game they belong to.
 ///
@@ -27,7 +30,6 @@ class StateSlots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final skin = EmulatorTheme.of(context);
     final target = rom ?? viewModel.playing;
 
     return Row(
@@ -38,66 +40,139 @@ class StateSlots extends StatelessWidget {
             saving ? EmulatorIcon.save : EmulatorIcon.load,
             size: 16,
           ),
-        for (var slot = 1; slot <= EmulatorViewModel.slotCount; slot++) ...[
-          const SizedBox(width: 6),
-          _slot(context, skin, target, slot),
-        ],
+        ...List.generate(
+          EmulatorViewModel.slotCount,
+          (index) => index + 1,
+        ).expand(
+          (slot) => [
+            const SizedBox(width: 6),
+            _StateSlot(
+              key: ValueKey((viewModel, target?.path, saving, slot)),
+              viewModel: viewModel,
+              rom: rom,
+              target: target,
+              saving: saving,
+              slot: slot,
+            ),
+          ],
+        ),
       ],
     );
   }
+}
 
-  Widget _slot(
-    BuildContext context,
-    EmulatorSkin skin,
-    RomFile? target,
-    int slot,
-  ) {
-    final occupied = target != null && viewModel.hasState(target, slot);
-    final feedback = saving && target != null
-        ? viewModel.saveFeedback[(target.path, slot)]
-        : null;
+class _StateSlot extends StatefulWidget {
+  const _StateSlot({
+    required this.viewModel,
+    required this.rom,
+    required this.target,
+    required this.saving,
+    required this.slot,
+    super.key,
+  });
+
+  final EmulatorViewModel viewModel;
+  final RomFile? rom;
+  final RomFile? target;
+  final bool saving;
+  final int slot;
+
+  @override
+  State<_StateSlot> createState() => _StateSlotState();
+}
+
+class _StateSlotState extends State<_StateSlot> {
+  Timer? _restore;
+  bool _pending = false;
+  bool _confirmed = false;
+
+  @override
+  void dispose() {
+    _restore?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _activate() async {
+    if (_pending) return;
+    _pending = true;
+    _restore?.cancel();
+    if (_confirmed) setState(() => _confirmed = false);
+
+    final succeeded = widget.saving
+        ? await widget.viewModel.saveState(widget.slot)
+        : await widget.viewModel.loadState(widget.slot, from: widget.rom);
+    _pending = false;
+    if (!mounted || !succeeded) return;
+
+    setState(() => _confirmed = true);
+    _restore = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _confirmed = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final skin = EmulatorTheme.of(context);
+    final target = widget.target;
+    final occupied =
+        target != null && widget.viewModel.hasState(target, widget.slot);
+
     final enabled =
         target != null &&
-        (saving
-            ? target.path == viewModel.playing?.path && feedback != .saving
+        !_pending &&
+        (widget.saving
+            ? target.path == widget.viewModel.playing?.path
             : occupied);
-    final label = '${feedback?.label ?? (saving ? 'Save' : 'Load')} slot $slot';
-    final color = occupied
-        ? skin.accent(context)
-        : skin.textStyle(context, EmulatorTextRole.caption).color;
+    final label = '${widget.saving ? 'Save' : 'Load'} slot ${widget.slot}';
     return skin.hint(
       context,
       label,
       Semantics(
-        label: label,
         button: true,
         enabled: enabled,
         selected: occupied,
+        label: label,
+        value: _confirmed ? (widget.saving ? 'Saved' : 'Loaded') : null,
+        liveRegion: _confirmed,
         child: MouseRegion(
           cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
           child: GestureDetector(
-            onTap: !enabled
-                ? null
-                : () => saving
-                      ? viewModel.saveState(slot)
-                      : viewModel.loadState(slot, from: rom),
-            child: Container(
-              width: 24,
-              height: 24,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: (occupied ? skin.accent(context) : skin.line(context))
-                    .withValues(alpha: occupied ? 0.18 : 0.08),
-                border: Border.all(
-                  color: occupied ? skin.accent(context) : skin.line(context),
+            onTap: enabled ? _activate : null,
+            child: ExcludeSemantics(
+              child: Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: (occupied ? skin.accent(context) : skin.line(context))
+                      .withValues(alpha: occupied ? 0.18 : 0.08),
+                  border: Border.all(
+                    color: occupied ? skin.accent(context) : skin.line(context),
+                  ),
+                  shape: BoxShape.circle,
                 ),
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                feedback?.symbol ?? '$slot',
-                style: skin
-                    .textStyle(context, EmulatorTextRole.caption)
-                    .copyWith(color: color),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Opacity(
+                      opacity: _confirmed ? 0 : 1,
+                      child: Text(
+                        '${widget.slot}',
+                        style: skin
+                            .textStyle(context, EmulatorTextRole.caption)
+                            .copyWith(
+                              color: occupied ? skin.accent(context) : null,
+                            ),
+                      ),
+                    ),
+                    if (_confirmed)
+                      EmulatorGlyph(
+                        EmulatorIcon.check,
+                        size: 16,
+                        color: skin.accent(context),
+                      ).centered().filled(),
+                  ],
+                ),
               ),
             ),
           ),

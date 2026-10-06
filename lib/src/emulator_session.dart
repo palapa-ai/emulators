@@ -28,10 +28,6 @@ enum EmulatorSpeed {
   final String label;
 }
 
-/// A running game, driven a frame at a time and published as decoded images.
-///
-/// libretro cores hold their state in globals, so one session exists at a
-/// time — [play] closes the previous one before opening another.
 class EmulatorSession extends ChangeNotifier {
   EmulatorSession({this.corePath, this.preview = false}) {
     _players.values.forEach((controls) {
@@ -117,9 +113,6 @@ class EmulatorSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// A preview runs far below full rate and never makes a sound: eight of
-  /// these at 60fps would spend the whole machine on pictures nobody is
-  /// looking at closely.
   final bool preview;
 
   static const previewFps = 10;
@@ -134,6 +127,8 @@ class EmulatorSession extends ChangeNotifier {
   static var _started = 0;
   Timer? _input;
   bool _decoding = false;
+  int _generation = 0;
+  bool _disposed = false;
 
   final _gamepad = Gamepad.open();
   final _secondGamepad = Gamepad.open(player: .p2);
@@ -207,7 +202,7 @@ class EmulatorSession extends ChangeNotifier {
   ui.Image? get frame => frames.value;
   String? get error => _error;
 
-  bool get isRunning => _emulator != null;
+  bool get isRunning => _emulator != null && _rom != null;
   bool get isPaused => _paused;
   EmulatorSpeed get speed => _speed;
 
@@ -230,11 +225,11 @@ class EmulatorSession extends ChangeNotifier {
 
   double get aspectRatio => _emulator?.aspectRatio ?? 4 / 3;
   String get coreName => _emulator?.coreName ?? '';
-  Uint8List? get systemRam => _emulator?.systemRam;
-  Uint8List? get videoRam => _emulator?.videoRam;
+  Uint8List? get systemRam => isRunning ? _emulator?.systemRam : null;
+  Uint8List? get videoRam => isRunning ? _emulator?.videoRam : null;
 
   void play(RomFile rom) {
-    stop();
+    unload();
 
     final core = corePath;
     if (core == null) {
@@ -247,7 +242,16 @@ class EmulatorSession extends ChangeNotifier {
 
     try {
       _fetch(rom);
-      _emulator = Emulator.open(corePath: core, romPath: rom.path);
+      if (_emulator?.corePath != core) {
+        _emulator?.close();
+        _emulator = null;
+      }
+      final emulator = _emulator;
+      if (emulator == null) {
+        _emulator = Emulator.open(corePath: core, romPath: rom.path);
+      } else {
+        emulator.loadRom(rom.path);
+      }
       if (preview) {
         _emulator?.setAudioDiscard(discard: true);
         _emulator?.setAudioMuted(muted: true);
@@ -262,7 +266,6 @@ class EmulatorSession extends ChangeNotifier {
       log('loaded ${rom.title} (${rom.path})');
       log('core ${_emulator?.coreName} ${_emulator?.coreVersion}');
     } on Object catch (e) {
-      _emulator = null;
       _status = SessionStatus.failed;
       _error = '$e';
       log('failed to load ${rom.title}: $e');
@@ -303,7 +306,10 @@ class EmulatorSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void stop() {
+  void unload() {
+    _generation++;
+    _paused = false;
+    _pauseOnFrame = false;
     _invalidateInput();
     _input?.cancel();
     _input = null;
@@ -320,19 +326,27 @@ class EmulatorSession extends ChangeNotifier {
     _stagger = null;
     _pump?.cancel();
     _pump = null;
-    _emulator?.stopAudio();
-    _emulator?.close();
-    _emulator = null;
+    _emulator?.unloadRom();
     _rom = null;
+    final frame = frames.value;
     frames.value = null;
+    frame?.dispose();
+    _stale?.dispose();
+    _stale = null;
     if (_status == SessionStatus.running) _status = SessionStatus.idle;
     notifyListeners();
+  }
+
+  void stop() {
+    unload();
+    _emulator?.close();
+    _emulator = null;
   }
 
   /// Stopping the moment a state is loaded leaves a black card — the core has
   /// not drawn anything yet — so the picture the player left is put up first.
   void pauseOnNextFrame() {
-    if (_emulator == null || _paused) return;
+    if (!isRunning || _paused) return;
     _pauseOnFrame = true;
   }
 
@@ -349,7 +363,7 @@ class EmulatorSession extends ChangeNotifier {
   }
 
   void pause() {
-    if (_emulator == null || _paused) return;
+    if (!isRunning || _paused) return;
     _paused = true;
     _invalidateInput();
     _emulator?.stopAudio();
@@ -358,9 +372,9 @@ class EmulatorSession extends ChangeNotifier {
   }
 
   void resume() {
-    if (_emulator == null || !_paused) return;
+    if (!isRunning || !_paused) return;
     _paused = false;
-    _emulator?.startAudio();
+    if (!preview) _emulator?.startAudio();
     log('resumed');
     notifyListeners();
   }
@@ -383,12 +397,14 @@ class EmulatorSession extends ChangeNotifier {
 
   /// Naming the slot is the caller's job, so success is logged there.
   Uint8List? saveState() {
+    if (!isRunning) return null;
     final state = _emulator?.saveState();
     if (state == null) log('save failed');
     return state;
   }
 
   bool loadState(Uint8List state) {
+    if (!isRunning) return false;
     _invalidateInput();
     final ok = _emulator?.loadState(state) ?? false;
     if (!ok) log('load failed');
@@ -483,7 +499,8 @@ class EmulatorSession extends ChangeNotifier {
   /// device, which is what makes audio crackle or slowly desynchronise.
   Future<void> _tick() async {
     final emulator = _emulator;
-    if (emulator == null || _decoding || _paused) return;
+    if (emulator == null || !isRunning || _decoding || _paused) return;
+    final generation = _generation;
 
     if (preview) {
       // Paced by the pump itself.
@@ -519,7 +536,7 @@ class EmulatorSession extends ChangeNotifier {
 
       final completer = Completer<ui.Image>();
       ui.decodeImageFromPixels(
-        pixels.buffer.asUint8List(0, width * height * 4),
+        Uint8List.fromList(pixels.buffer.asUint8List(0, width * height * 4)),
         width,
         height,
         ui.PixelFormat.bgra8888,
@@ -529,11 +546,12 @@ class EmulatorSession extends ChangeNotifier {
       );
 
       final image = await completer.future;
-      if (!identical(_emulator, emulator)) {
+      if (_disposed ||
+          generation != _generation ||
+          !identical(_emulator, emulator)) {
         image.dispose();
         return;
       }
-
       final stale = _stale;
       _stale = frames.value;
       frames.value = image;
@@ -550,6 +568,7 @@ class EmulatorSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     stop();
     _players.values.forEach((controls) {
       controls.removeListener(_writePlayers);
