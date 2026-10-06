@@ -3,7 +3,8 @@
 #include <errno.h>
 #include <stdarg.h>
 #ifdef _WIN32
-#define RETRO_API __cdecl
+/* Core entry points are loaded dynamically; this DLL exports only emu_* APIs. */
+#define RETRO_API
 #endif
 #include <libretro.h>
 #include <stdbool.h>
