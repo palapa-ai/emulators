@@ -13,6 +13,7 @@ class EmulatorTransport extends StatelessWidget {
     required this.viewModel,
     this.showTrainingData = true,
     this.showPixelShape = false,
+    this.showFullscreen = true,
     this.onPairController,
     this.onFullscreen,
     this.leading,
@@ -23,6 +24,7 @@ class EmulatorTransport extends StatelessWidget {
   final EmulatorViewModel viewModel;
   final bool showTrainingData;
   final bool showPixelShape;
+  final bool showFullscreen;
   final VoidCallback? onPairController;
   final ValueChanged<bool>? onFullscreen;
   final Widget? leading;
@@ -68,18 +70,17 @@ class EmulatorTransport extends StatelessWidget {
             onTap: viewModel.toggleTrainingData,
           ),
         ],
-        skin.button(
+        skin.hint(
           context,
-          label: viewModel.style?.label ?? 'Raw',
-          icon: viewModel.style.icon,
-          onTap: viewModel.cycleStyle,
-          onSecondaryTap: () => viewModel.cycleStyle(reverse: true),
-        ),
-        skin.button(
-          context,
-          label: viewModel.isMuted ? 'Unmute' : 'Mute',
-          icon: viewModel.isMuted ? .muted : .sound,
-          onTap: viewModel.toggleMuted,
+          'Display filter: ${viewModel.style?.label ?? 'Raw'}',
+          skin.button(
+            context,
+            label: viewModel.style?.label ?? 'Raw',
+            icon: .filter,
+            labelled: true,
+            onTap: viewModel.cycleStyle,
+            onSecondaryTap: () => viewModel.cycleStyle(reverse: true),
+          ),
         ),
         if (showPixelShape) ...[
           skin.button(
@@ -108,16 +109,23 @@ class EmulatorTransport extends StatelessWidget {
           icon: .reset,
           onTap: viewModel.reset,
         ),
-        if (trailing != null) ...[trailing ?? const SizedBox()],
         skin.button(
           context,
-          label: viewModel.fullscreen ? 'Leave fullscreen' : 'Fullscreen',
-          icon: viewModel.fullscreen ? .fullscreenExit : .fullscreen,
-          onTap: () {
-            viewModel.toggleFullscreen();
-            onFullscreen?.call(viewModel.fullscreen);
-          },
+          label: viewModel.isMuted ? 'Unmute' : 'Mute',
+          icon: viewModel.isMuted ? .muted : .sound,
+          onTap: viewModel.toggleMuted,
         ),
+        if (trailing != null) ...[trailing ?? const SizedBox()],
+        if (showFullscreen)
+          skin.button(
+            context,
+            label: viewModel.fullscreen ? 'Leave fullscreen' : 'Fullscreen',
+            icon: viewModel.fullscreen ? .fullscreenExit : .fullscreen,
+            onTap: () {
+              viewModel.toggleFullscreen();
+              onFullscreen?.call(viewModel.fullscreen);
+            },
+          ),
       ],
     );
     if (saves.isEmpty)

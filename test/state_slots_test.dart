@@ -57,7 +57,7 @@ void main() {
       '${saving ? 'save' : 'load'} confirms only after success without changing slot geometry',
       (tester) async {
         final temp = Directory.systemTemp.createTempSync('emulator_slots_');
-        final model = _SlotViewModel(temp.path);
+        final model = _SlotViewModel(temp.path)..occupied = true;
         addTearDown(() {
           model.dispose();
           temp.deleteSync(recursive: true);
@@ -67,14 +67,14 @@ void main() {
         );
         await tester.pumpAndSettle();
         final before = tester.getRect(find.byType(StateSlots));
-        final first = tester.getRect(find.text('①'));
-        final second = tester.getRect(find.text('②'));
+        final first = tester.getRect(find.text('1'));
+        final second = tester.getRect(find.text('2'));
 
-        await tester.tap(find.text('①'));
+        await tester.tap(find.text('1'));
         await tester.pump();
         expect(_glyph(EmulatorIcon.check), findsNothing);
         expect(model.results, hasLength(1));
-        await tester.tap(find.text('①'));
+        await tester.tap(find.text('1'));
         expect(model.results, hasLength(1));
         model.results.single.complete(true);
         await tester.idle();
@@ -86,13 +86,13 @@ void main() {
           findsOneWidget,
         );
         expect(tester.getRect(find.byType(StateSlots)), before);
-        expect(tester.getRect(find.text('①')), first);
-        expect(tester.getRect(find.text('②')), second);
+        expect(tester.getRect(find.text('1')), first);
+        expect(tester.getRect(find.text('2')), second);
         await tester.pump(const Duration(milliseconds: 1499));
         expect(_glyph(EmulatorIcon.check), findsOneWidget);
         await tester.pump(const Duration(milliseconds: 1));
         expect(_glyph(EmulatorIcon.check), findsNothing);
-        expect(tester.getRect(find.text('①')), first);
+        expect(tester.getRect(find.text('1')), first);
       },
     );
 
@@ -109,12 +109,12 @@ void main() {
           _wrap(StateSlots(viewModel: model, saving: saving)),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('②'));
+        await tester.tap(find.text('2'));
         model.results.single.complete(false);
         await tester.idle();
         await tester.pump();
         expect(_glyph(EmulatorIcon.check), findsNothing);
-        expect(find.text('②'), findsOneWidget);
+        expect(find.text('2'), findsOneWidget);
       },
     );
   }
@@ -123,14 +123,14 @@ void main() {
     'leaving during an operation or confirmation has no delayed state update',
     (tester) async {
       final temp = Directory.systemTemp.createTempSync('emulator_slots_');
-      final model = _SlotViewModel(temp.path);
+      final model = _SlotViewModel(temp.path)..occupied = true;
       addTearDown(() {
         model.dispose();
         temp.deleteSync(recursive: true);
       });
       await tester.pumpWidget(_wrap(StateSlots(viewModel: model)));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('①'));
+      await tester.tap(find.text('1'));
       await tester.pumpWidget(_wrap(const SizedBox()));
       model.results.single.complete(true);
       await tester.idle();
@@ -138,7 +138,7 @@ void main() {
       expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(_wrap(StateSlots(viewModel: model)));
-      await tester.tap(find.text('②'));
+      await tester.tap(find.text('2'));
       model.results.last.complete(true);
       await tester.idle();
       await tester.pump();
@@ -153,14 +153,14 @@ void main() {
     tester,
   ) async {
     final temp = Directory.systemTemp.createTempSync('emulator_slots_');
-    final model = _SlotViewModel(temp.path);
+    final model = _SlotViewModel(temp.path)..occupied = true;
     addTearDown(() {
       model.dispose();
       temp.deleteSync(recursive: true);
     });
     await tester.pumpWidget(_wrap(StateSlots(viewModel: model)));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('①'));
+    await tester.tap(find.text('1'));
     model.active = const RomFile(
       path: '/other.sfc',
       title: 'Other',
@@ -177,14 +177,14 @@ void main() {
     'a new operation clears its previous confirmation until it succeeds',
     (tester) async {
       final temp = Directory.systemTemp.createTempSync('emulator_slots_');
-      final model = _SlotViewModel(temp.path);
+      final model = _SlotViewModel(temp.path)..occupied = true;
       addTearDown(() {
         model.dispose();
         temp.deleteSync(recursive: true);
       });
       await tester.pumpWidget(_wrap(StateSlots(viewModel: model)));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('③'));
+      await tester.tap(find.text('3'));
       model.results.single.complete(true);
       await tester.idle();
       await tester.pump();

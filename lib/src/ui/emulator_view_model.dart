@@ -10,15 +10,19 @@ import '../emulator_agent.dart';
 import '../emulator_assistant.dart';
 import '../emulator_button.dart';
 import '../emulator_collection.dart';
+import '../emulator_preview.dart';
 import '../emulator_session.dart';
 import '../pad_element.dart';
+import '../player_controls.dart';
 import '../rom_file.dart';
 import '../rom_library.dart';
+import '../save_feedback.dart';
 
 /// Wires the models to the screen and holds nothing else. The shelf, the core
 /// lookup and the emulation itself live in [RomLibrary], [CoreLibrary] and
 /// [EmulatorSession] — this only forwards.
-class EmulatorViewModel extends ChangeNotifier {
+class EmulatorViewModel extends ChangeNotifier
+    implements EmulatorPreviewSource {
   EmulatorViewModel({
     String? corePath,
     String? libraryRoot,
@@ -39,6 +43,13 @@ class EmulatorViewModel extends ChangeNotifier {
   EmulatorSession? sessionFor(RomFile rom) => _collection.sessionFor(rom);
 
   ui.Image? pictureOf(RomFile rom) => _collection.pictureOf(rom);
+
+  // The collection owns a fixed pool; cards borrow it without starting runtimes.
+  EmulatorSession? retainPreview(RomFile rom) => _collection.sessionFor(rom);
+
+  void releasePreview(RomFile rom, EmulatorSession? preview) {}
+
+  void stopPreviews() => _collection.stopPreviews();
 
   /// Start the first cartridge as soon as both it and a core are known —
   /// for hosts that open straight into a game rather than the shelf.
@@ -101,20 +112,15 @@ class EmulatorViewModel extends ChangeNotifier {
   }
 
   /// null is the raw picture; cycling walks the styles and returns to it.
-  DisplayStyle? _style = DisplayStyle.vhs;
+  DisplayStyle? _style;
   DisplayStyle? get style => _style;
 
   void cycleStyle({bool reverse = false}) {
-    final current = _style;
-    final last = DisplayStyle.values.length - 1;
-    _style = switch ((current, reverse)) {
-      (null, false) => DisplayStyle.values.first,
-      (null, true) => DisplayStyle.values.last,
-      (final style?, false) when style.index == last => null,
-      (final style?, true) when style.index == 0 => null,
-      (final style?, false) => DisplayStyle.values[style.index + 1],
-      (final style?, true) => DisplayStyle.values[style.index - 1],
-    };
+    final cycle = <DisplayStyle?>[null, ...DisplayStyle.cycleOrder];
+    final index = cycle.indexOf(_style);
+    _style = index < 0
+        ? null
+        : cycle[(index + (reverse ? -1 : 1)) % cycle.length];
     final audio = _style?.audio ?? StyleAudio.clean;
     session.setAudioQuality(bits: audio.bits, mono: audio.mono);
     session.log(_style?.label.toLowerCase() ?? 'raw');
@@ -149,12 +155,18 @@ class EmulatorViewModel extends ChangeNotifier {
           logLines: session.logLines.length > 20
               ? session.logLines.sublist(session.logLines.length - 20)
               : session.logLines,
-          recentButtons: [for (final b in session.padLog) b.label],
+          recentButtons: session.padLog.map((button) => button.label).toList(),
           picture: await agent.screenshot(),
         ),
       );
     }();
   }
+
+  PlayerControls controlsFor(EmulatorPlayer player) =>
+      session.controlsFor(player);
+  String? padNameFor(EmulatorPlayer player) => session.padNameFor(player);
+  void assignPlayer(EmulatorPlayer player, ControllerDriver driver) =>
+      session.assignPlayer(player, driver);
 
   int get heldMask => session.heldMask;
   int get padMask => session.padMask;
@@ -217,7 +229,7 @@ class EmulatorViewModel extends ChangeNotifier {
     final file = File('${_library.rootPath}/$_lastPlayedFile');
     if (_library.rootPath == null || !file.existsSync()) return null;
     final path = file.readAsStringSync().trim();
-    return _roms.where((r) => r.path == path).firstOrNull;
+    return _roms.where((r) => r.allPaths.contains(path)).firstOrNull;
   }
 
   void _rememberLastPlayed(RomFile rom) {
@@ -266,24 +278,34 @@ class EmulatorViewModel extends ChangeNotifier {
       EmulatorCollection.statePath(rom, slot);
 
   bool hasState(RomFile rom, int slot) =>
-      File(_slotPath(rom, slot)).existsSync();
+      rom.existingSidecar('.state$slot') != null;
+
+  final Map<(String, int), SaveFeedback> saveFeedback = {};
 
   Future<bool> saveState(int slot) async {
     final rom = session.rom;
-    final state = session.saveState();
-    if (rom == null || state == null) return false;
-
+    if (rom == null || slot < 1 || slot > slotCount) return false;
+    final key = (rom.path, slot);
+    if (saveFeedback[key] == .saving) return false;
+    saveFeedback[key] = .saving;
+    notifyListeners();
     try {
+      final state = session.saveState();
+      if (state == null) throw StateError('No save state available');
       final path = _slotPath(rom, slot);
-      final pending = File('$path.tmp');
-      await pending.writeAsBytes(state, flush: true);
-      await pending.rename(path);
+      await File('$path.tmp').writeAsBytes(state, flush: true);
+      await File('$path.tmp').rename(path);
       if (_disposed) return false;
+      saveFeedback[key] = .saved;
       session.log('saved #$slot');
       notifyListeners();
       return true;
-    } on Object catch (error) {
-      if (!_disposed) session.log('could not save #$slot: $error');
+    } catch (error) {
+      if (!_disposed) {
+        saveFeedback[key] = .failed;
+        session.log('could not save #$slot: $error');
+        notifyListeners();
+      }
       return false;
     }
   }
@@ -292,7 +314,9 @@ class EmulatorViewModel extends ChangeNotifier {
     final rom = from ?? session.rom;
     if (rom == null) return false;
 
-    final file = File(_slotPath(rom, slot));
+    final file = File(
+      rom.existingSidecar('.state$slot') ?? _slotPath(rom, slot),
+    );
     if (!file.existsSync()) {
       session.log('slot $slot is empty');
       return false;
@@ -316,8 +340,11 @@ class EmulatorViewModel extends ChangeNotifier {
   void stop() => _collection.stop();
   void reset() => session.reset();
 
-  void press(EmulatorButton button, {required bool pressed}) =>
-      session.press(button, pressed: pressed);
+  void press(
+    EmulatorButton button, {
+    required bool pressed,
+    EmulatorPlayer player = .p1,
+  }) => session.press(button, pressed: pressed, player: player);
 
   @override
   void dispose() {

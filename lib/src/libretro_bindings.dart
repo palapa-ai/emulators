@@ -47,6 +47,10 @@ typedef _AudioReadNative =
     Int Function(Pointer<EmuSession>, Pointer<Int16>, Int);
 typedef EmuAudioRead = int Function(Pointer<EmuSession>, Pointer<Int16>, int);
 
+typedef _SetPlayerButtonNative =
+    Void Function(Pointer<EmuSession>, Int, Int, Int);
+typedef EmuSetPlayerButton = void Function(Pointer<EmuSession>, int, int, int);
+
 typedef _SetButtonNative = Void Function(Pointer<EmuSession>, Int, Int);
 typedef EmuSetButton = void Function(Pointer<EmuSession>, int, int);
 
@@ -96,6 +100,10 @@ class LibretroBindings {
       setButton = lib.lookupFunction<_SetButtonNative, EmuSetButton>(
         'emu_set_button',
       ),
+      setPlayerButton = lib
+          .lookupFunction<_SetPlayerButtonNative, EmuSetPlayerButton>(
+            'emu_set_player_button',
+          ),
       fps = lib.lookupFunction<_DoubleSessionNative, EmuDoubleSession>(
         'emu_fps',
       ),
@@ -182,6 +190,7 @@ class LibretroBindings {
   final EmuIntSession frameHeight;
   final EmuAudioRead audioRead;
   final EmuSetButton setButton;
+  final EmuSetPlayerButton setPlayerButton;
   final EmuDoubleSession fps;
   final EmuDoubleSession sampleRate;
   final EmuDoubleSession aspectRatio;

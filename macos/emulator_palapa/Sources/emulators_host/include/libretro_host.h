@@ -11,7 +11,7 @@ extern "C" {
 #if defined(_WIN32)
 #define EMU_API __declspec(dllexport)
 #else
-#define EMU_API __attribute__((visibility("default")))
+#define EMU_API __attribute__((visibility("default"), used))
 #endif
 
 typedef struct EmuSession EmuSession;
@@ -64,6 +64,7 @@ EMU_API void emu_audio_stop(EmuSession *s);
 EMU_API int emu_audio_queued(EmuSession *s);
 
 EMU_API void emu_set_button(EmuSession *s, int button, int pressed);
+EMU_API void emu_set_player_button(EmuSession *s, int port, int button, int pressed);
 EMU_API void emu_reset(EmuSession *s);
 
 /* The value most recently handed to the core, for checking the wiring. */

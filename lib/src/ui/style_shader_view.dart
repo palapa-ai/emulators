@@ -58,7 +58,8 @@ class _StyleShaderViewState extends State<StyleShaderView>
 
   // Tape and composite video move on their own — those looks need a clock.
   void _syncTicker() {
-    if (widget.style.shader || widget.style.shaderMode == 1) {
+    if (widget.style.shader ||
+        (widget.style.shaderMode == 1 || widget.style.shaderMode == 3)) {
       _ticker ??= Ticker((elapsed) {
         setState(() => _seconds = elapsed.inMicroseconds / 1000000);
       })..start();
@@ -74,7 +75,7 @@ class _StyleShaderViewState extends State<StyleShaderView>
     final program = await (_programs[asset] ??= ui.FragmentProgram.fromAsset(
       asset,
     ));
-    if (!mounted || _shaderAsset == asset) return;
+    if (!mounted || asset != _asset || _shaderAsset == asset) return;
     _shader?.dispose();
     setState(() {
       _shader = program.fragmentShader();
@@ -135,7 +136,10 @@ class _StylePainter extends CustomPainter {
         ..setFloat(15, style.tint.r)
         ..setFloat(16, style.tint.g)
         ..setFloat(17, style.tint.b)
-        ..setFloat(18, style.shaderMode);
+        ..setFloat(18, style.shaderMode)
+        ..setFloat(19, style.curvature)
+        ..setFloat(20, style.chroma)
+        ..setFloat(21, style.vignette);
     }
     shader.setImageSampler(0, frame);
 

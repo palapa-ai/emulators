@@ -28,6 +28,7 @@ class _SuggestionSkin extends EmulatorSkin {
     EmulatorIcon? icon,
     VoidCallback? onSecondaryTap,
     bool labelled = false,
+    bool preserveLabelCase = false,
   }) {
     prompts[label] = (icon: icon, labelled: labelled);
     return GestureDetector(onTap: onTap, child: Text(label));

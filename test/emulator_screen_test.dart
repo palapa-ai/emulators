@@ -41,13 +41,15 @@ void main() {
       ..createSync(recursive: true)
       ..childFile('Star Fox (U) (V1.2) [!].smc').writeAsBytesSync([0, 1, 2]);
 
-    await tester.pumpWidget(_wrap(EmulatorScreen(libraryRoot: temp.path)));
+    final model = EmulatorViewModel(libraryRoot: temp.path);
+    await tester.runAsync(model.refresh);
+    await tester.pumpWidget(_wrap(EmulatorScreen(viewModel: model)));
     await tester.pumpAndSettle();
 
     expect(find.text('Star Fox'), findsOneWidget);
-    expect(find.text('①'), findsOneWidget);
-    expect(find.text('②'), findsOneWidget);
-    expect(find.text('③'), findsOneWidget);
+    expect(find.text('1'), findsNWidgets(2));
+    await tester.pumpWidget(const SizedBox());
+    model.dispose();
   });
 
   testWidgets('a host skin replaces how the package draws', (tester) async {

@@ -79,7 +79,7 @@ class _WorkbenchState extends State<_Workbench> {
   Widget _screen(BuildContext context, EmulatorSkin skin) => EmulatorScreen(
     viewModel: _viewModel,
     showShelf: false,
-    showPixelShape: true,
+    showPixelShape: false,
     transportLeading: Row(
       mainAxisSize: .min,
       children: [
@@ -167,7 +167,7 @@ class _WorkbenchState extends State<_Workbench> {
                       children: [
                         Expanded(flex: 7, child: _screen(context, skin)),
                         const SizedBox(height: 12),
-                        _PadTicker(viewModel: _viewModel, skin: skin),
+                        ControlsView(viewModel: _viewModel, skin: skin),
                         const SizedBox(height: 12),
                         Expanded(flex: 2, child: bottomRow ?? const SizedBox()),
                       ],
@@ -355,95 +355,6 @@ class _LibraryCard extends StatelessWidget {
         ),
       ),
     ).clickable;
-  }
-}
-
-
-class _PadTicker extends StatelessWidget {
-  const _PadTicker({required this.viewModel, required this.skin});
-
-  final EmulatorViewModel viewModel;
-  final EmulatorSkin skin;
-
-  @override
-  Widget build(BuildContext context) {
-    final presses = viewModel.padLog;
-
-    return skin.panel(
-      context,
-      title: '',
-      leading: [
-        skin.button(
-          context,
-          label: viewModel.sharesTrainingData
-              ? 'sharing training data'
-              : 'not sharing training data',
-          icon: .training,
-          labelled: true,
-          onTap: viewModel.toggleTrainingData,
-        ),
-      ],
-      trailing: [
-        if (viewModel.padName case final pad?)
-          Row(
-            mainAxisSize: .min,
-            children: [
-              const EmulatorGlyph(
-                EmulatorIcon.controller,
-                size: 13,
-                color: Color(0x8ce8e8ee),
-              ),
-              const SizedBox(width: 6),
-              skin.text(context, pad, role: .caption),
-            ],
-          )
-        else
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: ControllerPairing.open,
-              child: Row(
-                mainAxisSize: .min,
-                children: [
-                  const EmulatorGlyph(
-                    EmulatorIcon.controller,
-                    size: 13,
-                    color: Color(0x8ce8e8ee),
-                  ),
-                  const SizedBox(width: 6),
-                  skin.text(context, 'Connect controller', role: .caption),
-                ],
-              ),
-            ),
-          ),
-      ],
-      child: SizedBox(
-        height: 24,
-        child: Row(
-          children: [
-            skin.text(context, 'Controller #1', role: .caption),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ListView.separated(
-                scrollDirection: .horizontal,
-                reverse: true,
-                itemCount: presses.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) => Center(
-                  child: skin.text(
-                    context,
-                    presses[presses.length - 1 - i].label,
-                    role: i == 0
-                        ? EmulatorTextRole.heading
-                        : EmulatorTextRole.caption,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

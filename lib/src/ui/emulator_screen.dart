@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:common_mvvm/common_mvvm.dart' as mvvm;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../emulator_button.dart';
 import '../emulator_session.dart';
 import '../rom_file.dart';
+import 'emulator_preview_view_model.dart';
 import 'emulator_skin.dart';
 import 'emulator_transport.dart';
 import 'emulator_view_model.dart';
@@ -44,9 +46,10 @@ class EmulatorScreen extends StatefulWidget {
     this.autoPlay = false,
     this.onPairController,
     this.showShelf = true,
+    this.showTransport = true,
     this.showPixelShape = false,
     this.showTrainingData = true,
-    this.showTransport = true,
+    this.showFullscreen = true,
     this.transportLeading,
     this.transportTrailing,
     this.onFullscreen,
@@ -68,6 +71,8 @@ class EmulatorScreen extends StatefulWidget {
   /// Hosts that give the collection its own place on screen turn this off.
   final bool showShelf;
 
+  final bool showTransport;
+
   /// Offers the pixel-shape toggle. A workbench wants to compare the two; a
   /// host that has picked the television's shape should not ask again.
   final bool showPixelShape;
@@ -76,9 +81,8 @@ class EmulatorScreen extends StatefulWidget {
   /// copy off rather than showing the player two of them.
   final bool showTrainingData;
 
-  /// Hosts with a separate [EmulatorTransport] hide this row; fullscreen
-  /// keeps its controls over the picture.
-  final bool showTransport;
+  /// Hosts with a fullscreen header action hide the transport copy.
+  final bool showFullscreen;
 
   /// Shown as a button while no pad is attached — pairing is the host's
   /// business, since only it knows how this platform opens Bluetooth.
@@ -146,9 +150,10 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             viewModel: viewModel,
             skin: skin,
             immersive: viewModel.fullscreen,
+            showTransport: widget.showTransport,
             showPixelShape: widget.showPixelShape,
             showTrainingData: widget.showTrainingData,
-            showTransport: widget.showTransport,
+            showFullscreen: widget.showFullscreen,
             onFullscreen: widget.onFullscreen,
             onPairController: widget.onPairController,
             transportLeading: viewModel.fullscreen
@@ -193,6 +198,7 @@ class _Stage extends StatelessWidget {
     this.showTransport = true,
     this.showPixelShape = false,
     this.showTrainingData = true,
+    this.showFullscreen = true,
     this.onPairController,
     this.transportLeading,
     this.transportTrailing,
@@ -201,9 +207,10 @@ class _Stage extends StatelessWidget {
   final EmulatorViewModel viewModel;
   final EmulatorSkin skin;
   final bool immersive;
+  final bool showTransport;
   final bool showPixelShape;
   final bool showTrainingData;
-  final bool showTransport;
+  final bool showFullscreen;
   final ValueChanged<bool>? onFullscreen;
   final VoidCallback? onPairController;
   final Widget? transportLeading;
@@ -219,33 +226,23 @@ class _Stage extends StatelessWidget {
       viewModel: viewModel,
       showTrainingData: showTrainingData,
       showPixelShape: showPixelShape,
+      showFullscreen: showFullscreen,
       onPairController: onPairController,
       onFullscreen: onFullscreen,
       leading: transportLeading,
       trailing: transportTrailing,
     );
 
-    // Filling the screen, the controls lie over the picture and leave when
-    // the pointer settles, so nothing but the game is on screen while playing.
-    if (immersive) {
-      return _Immersive(picture: picture, transport: transport);
-    }
-
-    if (!showTransport) return picture;
-
-    return Column(
-      children: [
-        Expanded(child: picture),
-        const SizedBox(height: 8),
-        transport,
-      ],
-    );
+    return showTransport || immersive
+        ? _Immersive(picture: picture, transport: transport)
+        : picture;
   }
 
   Widget _picture(BuildContext context) {
     final session = viewModel.session;
 
     return GestureDetector(
+      key: const ValueKey('emulator-picture'),
       onTap: viewModel.togglePause,
       child: Container(
         decoration: BoxDecoration(
@@ -279,7 +276,7 @@ class _Stage extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ).clickable;
   }
 }
 
@@ -298,14 +295,9 @@ class _Immersive extends StatefulWidget {
 class _ImmersiveState extends State<_Immersive> {
   static const _linger = Duration(seconds: 3);
 
-  bool _showing = true;
+  bool _showing = false;
+  bool _focused = false;
   Timer? _hide;
-
-  @override
-  void initState() {
-    super.initState();
-    _wake();
-  }
 
   @override
   void dispose() {
@@ -316,33 +308,46 @@ class _ImmersiveState extends State<_Immersive> {
   void _wake() {
     _hide?.cancel();
     _hide = Timer(_linger, () {
-      if (mounted) setState(() => _showing = false);
+      if (mounted && !_focused) setState(() => _showing = false);
     });
     if (!_showing) setState(() => _showing = true);
   }
 
   @override
-  Widget build(BuildContext context) => MouseRegion(
-    onHover: (_) => _wake(),
-    cursor: _showing ? SystemMouseCursors.basic : SystemMouseCursors.none,
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        widget.picture,
-        Positioned(
-          left: 24,
-          right: 24,
-          bottom: 24,
-          child: IgnorePointer(
-            ignoring: !_showing,
-            child: AnimatedOpacity(
-              opacity: _showing ? 1 : 0,
-              duration: const Duration(milliseconds: 220),
-              child: widget.transport,
+  Widget build(BuildContext context) => Focus(
+    onFocusChange: (focused) {
+      _focused = focused;
+      if (focused) _wake();
+    },
+    child: Listener(
+      onPointerDown: (_) => _wake(),
+      child: MouseRegion(
+        onEnter: (_) => _wake(),
+        onExit: (_) {
+          if (!_focused) setState(() => _showing = false);
+        },
+        onHover: (_) => _wake(),
+        cursor: SystemMouseCursors.basic,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            widget.picture,
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: 24,
+              child: IgnorePointer(
+                ignoring: !_showing,
+                child: AnimatedOpacity(
+                  opacity: _showing ? 1 : 0,
+                  duration: const Duration(milliseconds: 220),
+                  child: widget.transport,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 }
@@ -367,27 +372,31 @@ class _Idle extends StatelessWidget {
   }
 }
 
-/// A cartridge's own picture: the frame it was photographed on, or the one
-/// the player is looking at when it is the game on the screen.
-class _Preview extends StatelessWidget {
-  const _Preview({required this.viewModel, required this.rom});
+class _Preview extends mvvm.View<EmulatorPreviewViewModel> {
+  _Preview({required EmulatorViewModel viewModel, required this.rom})
+    : console = viewModel,
+      super(() => EmulatorPreviewViewModel(viewModel, rom));
 
-  final EmulatorViewModel viewModel;
+  final EmulatorViewModel console;
   final RomFile rom;
 
   @override
+  void updateViewModel(EmulatorPreviewViewModel viewModel) =>
+      viewModel.update(console, rom);
+
+  @override
   Widget build(BuildContext context) {
-    final live = viewModel.sessionFor(rom)?.frames;
+    final live = viewModel.session;
     if (live == null) {
-      return _Picture(viewModel: viewModel, image: viewModel.pictureOf(rom));
+      return _Picture(viewModel: console, image: console.pictureOf(rom));
     }
 
     return RepaintBoundary(
       child: ValueListenableBuilder<ui.Image?>(
-        valueListenable: live,
+        valueListenable: live.frames,
         builder: (context, frame, _) => _Picture(
-          viewModel: viewModel,
-          image: frame ?? viewModel.pictureOf(rom),
+          viewModel: console,
+          image: frame ?? console.pictureOf(rom),
         ),
       ),
     );
@@ -426,36 +435,61 @@ class EmulatorShelf extends StatelessWidget {
   Widget build(BuildContext context) {
     final roms = viewModel.roms;
 
-    return skin.panel(
-      context,
-      title: 'Collection',
-      child: SizedBox(
-        // The picture, in the console's shape, plus the card's own padding.
-        height: skin.cartridgePicture * 3 / 4 + 20,
-        child: roms.isEmpty
-            ? Center(
-                child: skin.text(context, 'No cartridges yet', role: .caption),
-              )
-            : ListView.separated(
-                scrollDirection: .horizontal,
-                itemCount: roms.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) => skin.cartridge(
-                  context,
-                  title: roms[i].title,
-                  year: roms[i].year,
-                  playing: roms[i] == viewModel.playing,
-                  preview: _Preview(viewModel: viewModel, rom: roms[i]),
-                  slots: StateSlots(
-                    viewModel: viewModel,
-                    rom: roms[i],
-                    saving: false,
-                    showIcon: false,
-                  ),
-                  onTap: () => viewModel.play(roms[i]),
-                  onRemove: () => viewModel.remove(roms[i]),
-                ),
+    return LayoutBuilder(
+      builder: (context, outerConstraints) => skin.panel(
+        context,
+        title: 'Collection',
+        fill: outerConstraints.hasBoundedHeight,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final rowHeight = skin.cartridgePicture * 3 / 4 + 48;
+            Widget cartridge(int i) => skin.cartridge(
+              context,
+              title: roms[i].title,
+              year: roms[i].year,
+              playing: roms[i] == viewModel.playing,
+              preview: _Preview(viewModel: viewModel, rom: roms[i]),
+              slots: Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  StateSlots(viewModel: viewModel, rom: roms[i]),
+                  StateSlots(viewModel: viewModel, rom: roms[i], saving: false),
+                ],
               ),
+              onTap: () => viewModel.play(roms[i]),
+              onRemove: () => viewModel.remove(roms[i]),
+            );
+
+            if (roms.isEmpty) {
+              return SizedBox(
+                height: rowHeight,
+                child: Center(
+                  child: skin.text(
+                    context,
+                    'No cartridges yet',
+                    role: .caption,
+                  ),
+                ),
+              );
+            }
+            return GridView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: !constraints.hasBoundedHeight,
+              itemCount: roms.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount:
+                    ((constraints.maxWidth + 8) / (skin.cartridgeWidth + 8))
+                        .floor()
+                        .clamp(1, roms.length),
+                mainAxisExtent: rowHeight,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemBuilder: (_, i) => cartridge(i),
+            );
+          },
+        ),
       ),
     );
   }

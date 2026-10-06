@@ -76,7 +76,6 @@ class _StateSlot extends StatefulWidget {
 }
 
 class _StateSlotState extends State<_StateSlot> {
-  static const _numerals = ['①', '②', '③'];
   Timer? _restore;
   bool _pending = false;
   bool _confirmed = false;
@@ -112,45 +111,71 @@ class _StateSlotState extends State<_StateSlot> {
     final occupied =
         target != null && widget.viewModel.hasState(target, widget.slot);
 
-    return Semantics(
-      button: true,
-      label: '${widget.saving ? 'Save' : 'Load'} slot ${widget.slot}',
-      value: _confirmed ? (widget.saving ? 'Saved' : 'Loaded') : null,
-      liveRegion: _confirmed,
-      child: GestureDetector(
-        onTap: _activate,
-        child: ExcludeSemantics(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Opacity(
-                opacity: _confirmed ? 0 : 1,
-                child: Text(
-                  _numerals[widget.slot - 1],
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: occupied
-                        ? skin.accent(context)
-                        : skin
-                              .textStyle(context, EmulatorTextRole.caption)
-                              .color,
+    final enabled =
+        target != null &&
+        !_pending &&
+        (widget.saving
+            ? target.path == widget.viewModel.playing?.path
+            : occupied);
+    final label = '${widget.saving ? 'Save' : 'Load'} slot ${widget.slot}';
+    return skin.hint(
+      context,
+      label,
+      Semantics(
+        button: true,
+        enabled: enabled,
+        selected: occupied,
+        label: label,
+        value: _confirmed ? (widget.saving ? 'Saved' : 'Loaded') : null,
+        liveRegion: _confirmed,
+        child: MouseRegion(
+          cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+          child: GestureDetector(
+            onTap: enabled ? _activate : null,
+            child: ExcludeSemantics(
+              child: Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: (occupied ? skin.accent(context) : skin.line(context))
+                      .withValues(alpha: occupied ? 0.18 : 0.08),
+                  border: Border.all(
+                    color: occupied ? skin.accent(context) : skin.line(context),
                   ),
+                  shape: BoxShape.circle,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Opacity(
+                      opacity: _confirmed ? 0 : 1,
+                      child: Text(
+                        '${widget.slot}',
+                        style: skin
+                            .textStyle(context, EmulatorTextRole.caption)
+                            .copyWith(
+                              color: occupied ? skin.accent(context) : null,
+                            ),
+                      ),
+                    ),
+                    if (_confirmed)
+                      Positioned.fill(
+                        child: Center(
+                          child: EmulatorGlyph(
+                            EmulatorIcon.check,
+                            size: 16,
+                            color: skin.accent(context),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              if (_confirmed)
-                Positioned.fill(
-                  child: Center(
-                    child: EmulatorGlyph(
-                      EmulatorIcon.check,
-                      size: 16,
-                      color: skin.accent(context),
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
-      ).clickable,
+      ),
     );
   }
 }

@@ -17,6 +17,9 @@ extension DisplayStyleIcon on DisplayStyle? {
     DisplayStyle.nes => EmulatorIcon.styleNes,
     DisplayStyle.gameBoy => EmulatorIcon.styleGameBoy,
     DisplayStyle.composite => EmulatorIcon.styleComposite,
+    DisplayStyle.projector => EmulatorIcon.styleHomeTv,
+    DisplayStyle.lcd => EmulatorIcon.styleDotMatrix,
+    DisplayStyle.oled => EmulatorIcon.styleRaw,
   };
 }
 
@@ -105,6 +108,12 @@ class _GlyphPainter extends CustomPainter {
           fill,
         );
         canvas.drawRRect(_bar(2.5, 11.5, 11, 1.8), fill);
+      case .filter:
+        for (final (y, x) in [(4.0, 6.0), (8.0, 10.0), (12.0, 5.0)]) {
+          canvas.drawLine(Offset(2, y), Offset(x - 1.5, y), stroke);
+          canvas.drawCircle(Offset(x, y), 1.5, stroke);
+          canvas.drawLine(Offset(x + 1.5, y), Offset(14, y), stroke);
+        }
       case .styleRaw:
         canvas.drawRRect(_bar(2.5, 4, 11, 8.5), stroke);
       case .styleVhs:

@@ -9,9 +9,11 @@ export 'src/emulator_session.dart'
     show EmulatorSession, EmulatorSpeed, SessionStatus;
 export 'src/gamepad.dart';
 export 'src/pad_element.dart';
+export 'src/player_controls.dart';
 export 'src/rom_catalog.dart';
 export 'src/rom_file.dart';
 export 'src/rom_library.dart';
+export 'src/save_feedback.dart';
 export 'src/ui/api_panel.dart';
 export 'src/ui/assistant_panel.dart';
 export 'src/ui/collapsing_panel.dart';

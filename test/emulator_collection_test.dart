@@ -72,7 +72,7 @@ void main() {
     ).getUint32(0, Endian.host);
   }
 
-  Future<void> frames(WidgetTester tester, [int count = 4]) async {
+  Future<void> frames(WidgetTester tester, [int count = 12]) async {
     for (var i = 0; i < count; i++) {
       await tester.pump(const Duration(milliseconds: 20));
       await tester.runAsync(

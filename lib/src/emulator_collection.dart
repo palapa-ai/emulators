@@ -254,6 +254,15 @@ class EmulatorCollection extends ChangeNotifier {
 
   static String statePath(RomFile rom, int slot) => '${rom.path}.state$slot';
 
+  void stopPreviews() {
+    _rotation?.cancel();
+    _rotation = null;
+    for (final preview in _previews) {
+      _parkPreview(preview);
+    }
+    notifyListeners();
+  }
+
   void stop() {
     if (!_parkPlaying()) return;
     session.stop();

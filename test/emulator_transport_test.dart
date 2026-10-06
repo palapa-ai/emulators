@@ -16,6 +16,7 @@ class _ButtonSkin extends EmulatorSkin {
     EmulatorIcon? icon,
     VoidCallback? onSecondaryTap,
     bool labelled = false,
+    bool preserveLabelCase = false,
   }) => GestureDetector(
     key: ValueKey(label),
     behavior: HitTestBehavior.opaque,
@@ -83,19 +84,19 @@ void main() {
           tester.view.physicalSize.width / tester.view.devicePixelRatio / 2,
         ),
       );
-      expect(find.text('①'), findsNWidgets(2));
+      expect(find.text('1'), findsNWidgets(2));
 
-      await tester.tap(find.byKey(const ValueKey('VHS')));
+      await tester.tap(find.byKey(const ValueKey('Raw')));
       await tester.pump();
-      expect(model.style, DisplayStyle.trinitron);
-      expect(find.byKey(const ValueKey('Trinitron')), findsOneWidget);
+      expect(model.style, DisplayStyle.gameBoy);
+      expect(find.byKey(const ValueKey('Game Boy')), findsOneWidget);
 
       await tester.tap(
-        find.byKey(const ValueKey('Trinitron')),
+        find.byKey(const ValueKey('Game Boy')),
         buttons: kSecondaryMouseButton,
       );
       await tester.pump();
-      expect(model.style, DisplayStyle.vhs);
+      expect(model.style, isNull);
 
       await tester.tap(find.byKey(const ValueKey('4:3')));
       await tester.pump();
@@ -130,7 +131,7 @@ void main() {
 
       model.cycleStyle();
       await tester.pump();
-      expect(find.byKey(const ValueKey('Trinitron')), findsOneWidget);
+      expect(find.byKey(const ValueKey('Game Boy')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('Fullscreen')));
       await tester.pump();
       expect(model.fullscreen, isTrue);
@@ -169,6 +170,10 @@ void main() {
       model.toggleFullscreen();
       await tester.pump();
       expect(find.byType(EmulatorTransport), findsOneWidget);
+      final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await pointer.addPointer(location: Offset.zero);
+      await pointer.moveTo(tester.getCenter(find.byType(EmulatorScreen)));
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('Leave fullscreen')));
       await tester.pump();
       expect(model.fullscreen, isFalse);
@@ -207,7 +212,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('①'), findsNWidgets(2));
+    expect(find.text('1'), findsNWidgets(2));
     expect(find.text('4:3'), findsOneWidget);
     final toolbar = tester.getRect(find.byType(EmulatorTransport));
     for (final glyph in tester.renderObjectList<RenderBox>(
