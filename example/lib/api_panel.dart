@@ -23,7 +23,7 @@ class _ApiPanelState extends State<ApiPanel> {
       name: 'poke',
       args: {
         'offset': 0,
-        'bytes': [widget.viewModel.agent.peek(0, 1)?.first ?? 0],
+        'bytes': [widget.viewModel.agent.peek(length: 1)?.first ?? 0],
       },
     ),
     'tap' => const AgentCall(name: 'tap', args: {'button': 'start'}),

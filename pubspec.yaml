@@ -1,10 +1,17 @@
 name: emulators
 description: >-
-  Console emulation for Palapa. Wraps libretro cores behind a Dart API: the
-  native side is a thin host that pumps frames, audio and input, and the Dart
-  side owns sessions, save states and the display styles.
-version: 0.0.1
-publish_to: "none"
+  Console emulation for Flutter. Wraps libretro cores behind a Dart API, with
+  save states, period display shaders and a seam for a language model.
+version: 0.1.0
+
+repository: https://github.com/palapa-ai/emulators
+issue_tracker: https://github.com/palapa-ai/emulators/issues
+
+topics:
+  - emulator
+  - libretro
+  - games
+  - ffi
 
 environment:
   sdk: ^3.12.0

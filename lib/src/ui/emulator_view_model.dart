@@ -164,6 +164,16 @@ class EmulatorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The picture alone, filling the screen — the shelf, the panels and the
+  /// host's own chrome all step out of the way until it is turned off.
+  bool _fullscreen = false;
+  bool get fullscreen => _fullscreen;
+
+  void toggleFullscreen() {
+    _fullscreen = !_fullscreen;
+    notifyListeners();
+  }
+
   /// null is the raw picture; cycling walks the styles and returns to it.
   DisplayStyle? _style = DisplayStyle.vhs;
   DisplayStyle? get style => _style;

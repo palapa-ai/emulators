@@ -92,6 +92,7 @@ class _GlyphPainter extends CustomPainter {
       case EmulatorIcon.share:
       case EmulatorIcon.check:
       case EmulatorIcon.fullscreen:
+      case EmulatorIcon.fullscreenExit:
         break;
       case EmulatorIcon.eject:
         canvas.drawPath(

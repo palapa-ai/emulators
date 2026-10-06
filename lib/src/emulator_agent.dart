@@ -34,7 +34,7 @@ class EmulatorAgent {
 
   /// The surface, by name — what an assistant is told it may ask for.
   static const api = {
-    'peek': 'read [length] bytes of work RAM at [offset]',
+    'peek': 'read work RAM — the whole of it unless [offset] and [length] narrow it',
     'poke': 'write [bytes] into work RAM at [offset]',
     'tap': 'press [button] for [frames] frames',
     'screenshot': 'the current picture as a PNG',
@@ -42,13 +42,15 @@ class EmulatorAgent {
     'load_state': 'restore the last snapshot',
   };
 
-  Uint8List? peek(int offset, int length) {
+  /// The whole dump by default: a model reasoning about a game needs to see
+  /// the memory before it can know which address it wants.
+  Uint8List? peek({int offset = 0, int? length}) {
     final ram = _session.systemRam;
     if (ram == null || offset < 0 || offset >= ram.length) return null;
     return Uint8List.sublistView(
       ram,
       offset,
-      (offset + length).clamp(0, ram.length),
+      length == null ? ram.length : (offset + length).clamp(0, ram.length),
     );
   }
 
@@ -94,8 +96,8 @@ class EmulatorAgent {
     switch (call.name) {
       case 'peek':
         final bytes = peek(
-          call.args['offset'] as int? ?? 0,
-          call.args['length'] as int? ?? 16,
+          offset: call.args['offset'] as int? ?? 0,
+          length: call.args['length'] as int?,
         );
         return bytes == null
             ? null
