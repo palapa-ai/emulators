@@ -540,24 +540,17 @@ class _PadTicker extends StatelessWidget {
           label: viewModel.sharesTrainingData
               ? 'share training data'
               : 'do not share training data',
+          icon: .share,
           onTap: viewModel.toggleTrainingData,
         ),
       ],
       trailing: [
-        if (viewModel.padName case final pad?)
-          skin.text(context, pad, role: EmulatorTextRole.caption)
-        else
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: ControllerPairing.open,
-              child: skin.text(
-                context,
-                'Connect controller',
-                role: EmulatorTextRole.caption,
-              ),
-            ),
-          ),
+        skin.button(
+          context,
+          label: viewModel.padName ?? 'Connect controller',
+          icon: .controller,
+          onTap: ControllerPairing.open,
+        ),
       ],
       child: SizedBox(
         height: 24,
