@@ -210,6 +210,7 @@ class _CoreCopies {
   static final _ready = <String, List<String>>{};
   static var _next = 0;
   static const _spares = 4;
+  static final _extension = Platform.isWindows ? 'dll' : 'dylib';
 
   static String take(String corePath) {
     final ready = _ready[corePath] ??= <String>[];
@@ -221,7 +222,7 @@ class _CoreCopies {
   static void discard(String copy) => unawaited(File(copy).delete());
 
   static String _cut(String corePath) {
-    final copy = '${_root.path}/core${_next++}.dylib';
+    final copy = '${_root.path}/core${_next++}.$_extension';
     File(corePath).copySync(copy);
     return copy;
   }
@@ -229,7 +230,7 @@ class _CoreCopies {
   static Future<void> _topUp(String corePath) async {
     final ready = _ready[corePath] ??= <String>[];
     while (ready.length < _spares) {
-      final copy = '${_root.path}/core${_next++}.dylib';
+      final copy = '${_root.path}/core${_next++}.$_extension';
       await File(corePath).copy(copy);
       ready.add(copy);
     }

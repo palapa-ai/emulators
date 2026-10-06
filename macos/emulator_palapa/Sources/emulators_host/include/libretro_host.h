@@ -9,7 +9,11 @@ extern "C" {
 #endif
 
 #if defined(_WIN32)
+#if defined(EMU_HOST_IMPORT)
+#define EMU_API __declspec(dllimport)
+#else
 #define EMU_API __declspec(dllexport)
+#endif
 #else
 #define EMU_API __attribute__((visibility("default"), used))
 #endif
