@@ -14,6 +14,7 @@ import 'emulator_transport.dart';
 import 'emulator_view_model.dart';
 import 'state_slots.dart';
 import 'style_shader_view.dart';
+import 'widget_layout.dart';
 
 /// Which key stands for which button. Public because "what are the
 /// controls" is a question the screen has to be able to answer.
@@ -175,7 +176,7 @@ class _EmulatorScreenState extends State<EmulatorScreen> {
             child: Column(
               crossAxisAlignment: .stretch,
               children: [
-                Expanded(child: stage),
+                stage.expanded(),
                 if (widget.showShelf) ...[
                   const SizedBox(height: 16),
                   EmulatorShelf(viewModel: viewModel, skin: skin),
@@ -256,23 +257,17 @@ class _Stage extends StatelessWidget {
             valueListenable: session.frames,
             // The stage fills whatever room it is given, but the picture
             // keeps the shape the console drew it in.
-            builder: (context, frame, _) => Center(
-              child: switch ((frame, viewModel.style)) {
-                (null, _) => const SizedBox.expand(),
-                (final frame?, final style?) => AspectRatio(
-                  aspectRatio: viewModel.aspectFor(frame.width, frame.height),
-                  child: StyleShaderView(frame: frame, style: style),
-                ),
-                (final frame?, null) => AspectRatio(
-                  aspectRatio: viewModel.aspectFor(frame.width, frame.height),
-                  child: RawImage(
-                    image: frame,
-                    fit: .fill,
-                    filterQuality: .none,
-                  ),
-                ),
-              },
-            ),
+            builder: (context, frame, _) => (switch ((frame, viewModel.style)) {
+              (null, _) => const SizedBox.expand(),
+              (final frame?, final style?) => AspectRatio(
+                aspectRatio: viewModel.aspectFor(frame.width, frame.height),
+                child: StyleShaderView(frame: frame, style: style),
+              ),
+              (final frame?, null) => AspectRatio(
+                aspectRatio: viewModel.aspectFor(frame.width, frame.height),
+                child: RawImage(image: frame, fit: .fill, filterQuality: .none),
+              ),
+            }).centered(),
           ),
         ),
       ),
@@ -368,7 +363,7 @@ class _Idle extends StatelessWidget {
       _ => 'Pick a game',
     };
 
-    return Center(child: skin.text(context, message, role: .caption));
+    return skin.text(context, message, role: .caption).centered();
   }
 }
 
@@ -464,13 +459,9 @@ class EmulatorShelf extends StatelessWidget {
             if (roms.isEmpty) {
               return SizedBox(
                 height: rowHeight,
-                child: Center(
-                  child: skin.text(
-                    context,
-                    'No cartridges yet',
-                    role: .caption,
-                  ),
-                ),
+                child: skin
+                    .text(context, 'No cartridges yet', role: .caption)
+                    .centered(),
               );
             }
             return GridView.builder(

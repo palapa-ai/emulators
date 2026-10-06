@@ -4,6 +4,7 @@ import '../controller_pairing.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 import 'state_slots.dart';
+import 'widget_layout.dart';
 
 /// The emulator's existing playback, display and save controls, for hosts
 /// that give them their own place outside the screen.
@@ -143,7 +144,7 @@ class EmulatorTransport extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 16),
-        Expanded(flex: 3, child: playback),
+        playback.expanded(flex: 3),
       ],
     );
   }

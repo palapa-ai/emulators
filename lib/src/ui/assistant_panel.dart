@@ -5,6 +5,7 @@ import '../emulator_assistant.dart';
 import 'collapsing_panel.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
+import 'widget_layout.dart';
 
 /// One turn of the conversation.
 class _Turn {
@@ -92,65 +93,58 @@ class _AssistantPanelState extends State<AssistantPanel> {
           if (_needsEndpoint) ...[
             Row(
               children: [
-                Expanded(
-                  child: _Field(hint: 'https://api…/v1', controller: _url),
-                ),
+                _Field(hint: 'https://api…/v1', controller: _url).expanded(),
                 const SizedBox(width: 6),
-                Expanded(
-                  child: _Field(
-                    hint: 'API key',
-                    controller: _key,
-                    obscure: true,
-                  ),
-                ),
+                _Field(
+                  hint: 'API key',
+                  controller: _key,
+                  obscure: true,
+                ).expanded(),
               ],
             ),
             const SizedBox(height: 6),
           ],
           if (_turns.isEmpty)
-            Expanded(
-              child: Column(
-                crossAxisAlignment: .stretch,
-                mainAxisAlignment: .start,
-                children: [
-                  skin.text(context, 'Try asking:'),
-                  const SizedBox(height: 6),
-                  for (final example in _examples)
-                    skin.button(
-                      context,
-                      label: example,
-                      icon: .controller,
-                      labelled: true,
-                      onTap: () => _send(example),
-                    ),
-                ],
-              ),
-            )
+            Column(
+              crossAxisAlignment: .stretch,
+              mainAxisAlignment: .start,
+              children: [
+                skin.text(context, 'Try asking:'),
+                const SizedBox(height: 6),
+                ..._examples.map(
+                  (example) => skin.button(
+                    context,
+                    label: example,
+                    icon: .controller,
+                    labelled: true,
+                    onTap: () => _send(example),
+                  ),
+                ),
+              ],
+            ).expanded()
           else
-            Expanded(
-              child: ListView.builder(
-                controller: _scroll,
-                reverse: true,
-                padding: EdgeInsets.zero,
-                itemCount: _turns.length,
-                itemBuilder: (context, i) {
-                  final turn = _turns[_turns.length - 1 - i];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: skin.measureWidth(context),
-                      ),
-                      child: skin.text(
-                        context,
-                        turn.mine ? '> ${turn.text}' : turn.text,
-                        role: turn.mine ? .body : .caption,
-                      ),
+            ListView.builder(
+              controller: _scroll,
+              reverse: true,
+              padding: EdgeInsets.zero,
+              itemCount: _turns.length,
+              itemBuilder: (context, i) {
+                final turn = _turns[_turns.length - 1 - i];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: skin.measureWidth(context),
                     ),
-                  );
-                },
-              ),
-            ),
+                    child: skin.text(
+                      context,
+                      turn.mine ? '> ${turn.text}' : turn.text,
+                      role: turn.mine ? .body : .caption,
+                    ),
+                  ),
+                );
+              },
+            ).expanded(),
           const SizedBox(height: 6),
           _Field(
             hint: 'Ask about the game…',

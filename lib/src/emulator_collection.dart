@@ -40,9 +40,7 @@ class EmulatorCollection extends ChangeNotifier {
 
   void useCore(String? path) {
     session.corePath = path;
-    for (final preview in _previews) {
-      preview.corePath = path;
-    }
+    _previews.forEach((preview) => preview.corePath = path);
     _startPreviews();
   }
 
@@ -68,10 +66,10 @@ class EmulatorCollection extends ChangeNotifier {
     _failed.removeWhere((path) => !paths.contains(path));
     final playing = session.rom;
     if (playing != null && !paths.contains(playing.path)) session.stop();
-    for (final path
-        in _pictures.keys.where((p) => !paths.contains(p)).toList()) {
-      _pictures.remove(path)?.dispose();
-    }
+    _pictures.keys
+        .where((path) => !paths.contains(path))
+        .toList()
+        .forEach((path) => _pictures.remove(path)?.dispose());
     _startPreviews();
     unawaited(_loadPictures(roms));
   }
@@ -104,26 +102,31 @@ class EmulatorCollection extends ChangeNotifier {
     );
     _next = candidates.isEmpty ? 0 : (_next + count) % candidates.length;
 
-    for (final preview in _previews) {
-      if (preview.rom != null && !next.contains(preview.rom))
-        _parkPreview(preview);
-    }
-    for (final rom in next) {
-      if (sessionFor(rom) != null) continue;
-      final preview = _previews.where((s) => s.rom == null).firstOrNull;
-      if (preview == null) break;
-      preview.play(rom);
-      if (!preview.isRunning) {
-        _failed.add(rom.path);
-        continue;
-      }
-      final state = _previewStates[rom.path];
-      if (state != null && !preview.loadState(state)) {
-        _failed.add(rom.path);
-        preview.unload();
-      }
-    }
+    _previews
+        .where((preview) => preview.rom != null && !next.contains(preview.rom))
+        .forEach(_parkPreview);
+    next
+        .where((rom) => sessionFor(rom) == null)
+        .takeWhile((_) => _previews.any((preview) => preview.rom == null))
+        .forEach(_playPreview);
     notifyListeners();
+  }
+
+  void _playPreview(RomFile rom) {
+    final preview = _previews
+        .where((preview) => preview.rom == null)
+        .firstOrNull;
+    if (preview == null) return;
+    preview.play(rom);
+    if (!preview.isRunning) {
+      _failed.add(rom.path);
+      return;
+    }
+    final state = _previewStates[rom.path];
+    if (state != null && !preview.loadState(state)) {
+      _failed.add(rom.path);
+      preview.unload();
+    }
   }
 
   void _rememberPicture(EmulatorSession source) {
@@ -232,24 +235,26 @@ class EmulatorCollection extends ChangeNotifier {
     final core = session.corePath;
     if (core == null) return;
     final portraits = RomPortraits();
-    for (final rom in roms) {
-      if (_disposed || _pictures.containsKey(rom.path)) continue;
+    Future<void> loadPicture(RomFile rom) async {
+      if (_disposed || _pictures.containsKey(rom.path)) return;
       ui.Image? image;
       try {
         image = await portraits.load(rom);
       } on Object {
-        continue;
+        return;
       }
-      if (image == null) continue;
+      if (image == null) return;
       if (_disposed ||
           !_roms.contains(rom) ||
           _pictures.containsKey(rom.path)) {
         image.dispose();
-        continue;
+        return;
       }
       _pictures[rom.path] = image;
       notifyListeners();
     }
+
+    await Future.forEach(roms, loadPicture);
   }
 
   static String statePath(RomFile rom, int slot) => '${rom.path}.state$slot';
@@ -257,9 +262,7 @@ class EmulatorCollection extends ChangeNotifier {
   void stopPreviews() {
     _rotation?.cancel();
     _rotation = null;
-    for (final preview in _previews) {
-      _parkPreview(preview);
-    }
+    _previews.forEach(_parkPreview);
     notifyListeners();
   }
 
@@ -278,12 +281,8 @@ class EmulatorCollection extends ChangeNotifier {
     session
       ..removeListener(notifyListeners)
       ..dispose();
-    for (final preview in _previews) {
-      preview.dispose();
-    }
-    for (final image in _pictures.values) {
-      image.dispose();
-    }
+    _previews.forEach((preview) => preview.dispose());
+    _pictures.values.forEach((image) => image.dispose());
     _pictures.clear();
     _previewStates.clear();
     super.dispose();

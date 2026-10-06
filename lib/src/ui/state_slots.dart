@@ -6,6 +6,7 @@ import '../rom_file.dart';
 import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
+import 'widget_layout.dart';
 
 /// Three save slots and three load slots, beside the game they belong to.
 ///
@@ -39,17 +40,22 @@ class StateSlots extends StatelessWidget {
             saving ? EmulatorIcon.save : EmulatorIcon.load,
             size: 16,
           ),
-        for (var slot = 1; slot <= EmulatorViewModel.slotCount; slot++) ...[
-          const SizedBox(width: 6),
-          _StateSlot(
-            key: ValueKey((viewModel, target?.path, saving, slot)),
-            viewModel: viewModel,
-            rom: rom,
-            target: target,
-            saving: saving,
-            slot: slot,
-          ),
-        ],
+        ...List.generate(
+          EmulatorViewModel.slotCount,
+          (index) => index + 1,
+        ).expand(
+          (slot) => [
+            const SizedBox(width: 6),
+            _StateSlot(
+              key: ValueKey((viewModel, target?.path, saving, slot)),
+              viewModel: viewModel,
+              rom: rom,
+              target: target,
+              saving: saving,
+              slot: slot,
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -160,15 +166,11 @@ class _StateSlotState extends State<_StateSlot> {
                       ),
                     ),
                     if (_confirmed)
-                      Positioned.fill(
-                        child: Center(
-                          child: EmulatorGlyph(
-                            EmulatorIcon.check,
-                            size: 16,
-                            color: skin.accent(context),
-                          ),
-                        ),
-                      ),
+                      EmulatorGlyph(
+                        EmulatorIcon.check,
+                        size: 16,
+                        color: skin.accent(context),
+                      ).centered().filled(),
                   ],
                 ),
               ),
