@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 
 import '../controller_pairing.dart';
-import 'emulator_glyph.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 import 'state_slots.dart';
