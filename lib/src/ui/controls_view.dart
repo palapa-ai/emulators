@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../controller_pairing.dart';
 import '../player_controls.dart';
-import 'emulator_glyph.dart';
+import '../emulator_button.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 
@@ -69,12 +69,9 @@ class ControlsView extends StatelessWidget {
                 _ControllerLine(
                   skin: skin,
                   label: viewModel.controlsFor(player).label,
+                  driver: viewModel.controlsFor(player).driver,
                   name: viewModel.padNameFor(player),
-                  presses: viewModel
-                      .controlsFor(player)
-                      .history
-                      .map((b) => b.label)
-                      .toList(),
+                  presses: viewModel.controlsFor(player).history,
                   onToggle: onDriverChanged == null
                       ? null
                       : () => onDriverChanged?.call(player),
@@ -94,6 +91,7 @@ class _ControllerLine extends StatelessWidget {
   const _ControllerLine({
     required this.skin,
     required this.label,
+    required this.driver,
     this.onToggle,
     required this.presses,
     this.name,
@@ -103,24 +101,20 @@ class _ControllerLine extends StatelessWidget {
   final String label;
   final VoidCallback? onToggle;
   final String? name;
-  final List<String> presses;
+  final List<EmulatorButton> presses;
+  final ControllerDriver driver;
 
   @override
   Widget build(BuildContext context) => SizedBox(
     height: 32,
     child: Row(
       children: [
-        const EmulatorGlyph(EmulatorIcon.controller, size: 13),
-        const SizedBox(width: 6),
-        if (onToggle case final toggle?)
-          skin.button(
-            context,
-            label: label,
-            onTap: toggle,
-            preserveLabelCase: true,
-          )
-        else
-          skin.text(context, label, role: .caption),
+        skin.controllerDriver(
+          context,
+          driver: driver,
+          label: label,
+          onTap: onToggle,
+        ),
         if (name case final value?) ...[
           const SizedBox(width: 8),
           Flexible(
@@ -144,7 +138,7 @@ class _ControllerLine extends StatelessWidget {
                   itemCount: presses.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (_, i) => Center(
-                    child: skin.text(
+                    child: skin.controllerInput(
                       context,
                       presses[presses.length - 1 - i],
                       role: i == 0 ? .heading : .caption,

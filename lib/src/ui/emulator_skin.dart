@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import 'emulator_glyph.dart';
+import '../player_controls.dart';
+import '../emulator_button.dart';
 
 enum EmulatorTextRole { heading, body, caption }
 
@@ -104,6 +106,21 @@ class EmulatorSkin {
     overflow: maxLines == null ? null : TextOverflow.ellipsis,
     style: textStyle(context, role),
   );
+
+  Widget controllerDriver(
+    BuildContext context, {
+    required ControllerDriver driver,
+    required String label,
+    VoidCallback? onTap,
+  }) => onTap == null
+      ? text(context, label, role: .caption)
+      : button(context, label: label, onTap: onTap, preserveLabelCase: true);
+
+  Widget controllerInput(
+    BuildContext context,
+    EmulatorButton input, {
+    required EmulatorTextRole role,
+  }) => text(context, input.label, role: role);
 
   Widget button(
     BuildContext context, {
