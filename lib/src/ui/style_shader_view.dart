@@ -31,6 +31,7 @@ class _StyleShaderViewState extends State<StyleShaderView>
   String? _shaderAsset;
   Ticker? _ticker;
   double _seconds = 0;
+  int _lastTick = -33333;
 
   String get _asset => widget.style.shader
       ? 'packages/emulator_palapa/shaders/vhs.frag'
@@ -60,27 +61,38 @@ class _StyleShaderViewState extends State<StyleShaderView>
   void _syncTicker() {
     if (widget.style.shader ||
         (widget.style.shaderMode == 1 || widget.style.shaderMode == 3)) {
-      _ticker ??= Ticker((elapsed) {
-        setState(() => _seconds = elapsed.inMicroseconds / 1000000);
-      })..start();
+      _ticker ??= createTicker((elapsed) {
+        if (elapsed.inMicroseconds - _lastTick < 33333) return;
+        _lastTick = elapsed.inMicroseconds;
+        setState(() => _seconds = (elapsed.inMicroseconds / 1000000) % 3600);
+      });
+      if (_ticker?.isActive == false) {
+        _lastTick = -33333;
+        _ticker?.start();
+      }
     } else {
-      _ticker?.dispose();
-      _ticker = null;
+      _ticker?.stop();
       _seconds = 0;
     }
   }
 
   Future<void> _load() async {
     final asset = _asset;
-    final program = await (_programs[asset] ??= ui.FragmentProgram.fromAsset(
-      asset,
-    ));
+    final ui.FragmentProgram program;
+    try {
+      program = await (_programs[asset] ??= ui.FragmentProgram.fromAsset(asset));
+    } catch (error, stack) {
+      _programs.remove(asset);
+      FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack, library: 'emulator display'));
+      return;
+    }
     if (!mounted || asset != _asset || _shaderAsset == asset) return;
-    _shader?.dispose();
+    final previous = _shader;
     setState(() {
       _shader = program.fragmentShader();
       _shaderAsset = asset;
     });
+    if (previous != null) WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
   }
 
   @override

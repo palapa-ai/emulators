@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:emulator_palapa/src/rom_library.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
   late Directory root;
@@ -26,11 +27,22 @@ void main() {
       File('${duplicate.path}.png').writeAsBytesSync([33]);
       final roms = await library.load();
       expect(roms, hasLength(2));
-      final merged = roms.singleWhere((rom) => rom.path == original.path);
-      expect(merged.aliases, [duplicate.path]);
-      expect(merged.existingSidecar('.state1'), '${original.path}.state1');
-      expect(merged.existingSidecar('.state2'), '${duplicate.path}.state2');
-      expect(merged.existingSidecar('.png'), '${duplicate.path}.png');
+      final merged = roms.singleWhere(
+        (rom) => p.equals(rom.path, original.path),
+      );
+      expect(merged.aliases.map(p.normalize), [p.normalize(duplicate.path)]);
+      expect(
+        merged.existingSidecar('.state1'),
+        p.normalize('${original.path}.state1'),
+      );
+      expect(
+        merged.existingSidecar('.state2'),
+        p.normalize('${duplicate.path}.state2'),
+      );
+      expect(
+        merged.existingSidecar('.png'),
+        p.normalize('${duplicate.path}.png'),
+      );
       expect(duplicate.existsSync(), isTrue);
     },
   );
@@ -82,8 +94,8 @@ void main() {
       older.setLastModifiedSync(DateTime(2020));
       final newer = File('${alias.path}.state1')..writeAsBytesSync([20]);
       final merged = (await library.load()).single;
-      expect(merged.path, original.path);
-      expect(merged.existingSidecar('.state1'), newer.path);
+      expect(merged.path, p.normalize(original.path));
+      expect(merged.existingSidecar('.state1'), p.normalize(newer.path));
       expect(older.readAsBytesSync(), [10]);
       expect(newer.readAsBytesSync(), [20]);
       expect(alias.existsSync(), isTrue);

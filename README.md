@@ -126,6 +126,22 @@ cd snes9x2010 && make -f Makefile.libretro
 cores carry a **non-commercial** licence; permissive cores such as `ares` are
 the ones to reach for if that matters.
 
+On Windows, download the x64 `snes9x2010_libretro.dll.zip` core from the
+[Libretro buildbot](https://buildbot.libretro.com/nightly/windows/x86_64/latest/).
+Cores remain separate from the app. Verify the downloaded archive and install
+it without Visual Studio:
+
+```powershell
+./tool/install_windows_core.ps1 -ArchivePath ./snes9x2010_libretro.dll.zip `
+  -Sha256 '<verified archive SHA-256>' `
+  -CoreDirectory "$env:APPDATA/Palapa/palapa/cores"
+dart tool/check_native_exports.dart --app path/to/Palapa
+```
+
+Omitting `CoreDirectory` installs into the standalone package's default library.
+The installer refuses a checksum mismatch or an existing core. Games stay in
+Palapa Drive; no game cartridges are bundled.
+
 ## Running it
 
 ```

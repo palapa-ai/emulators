@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:io';
 
 /// Allocation and C strings, taken from libc directly rather than through a
 /// package: the whole need is four calls.
-final DynamicLibrary _libc = DynamicLibrary.process();
+final DynamicLibrary _libc = Platform.isWindows
+    ? DynamicLibrary.open('ucrtbase.dll')
+    : DynamicLibrary.process();
 
 final Pointer<Void> Function(int, int) _calloc = _libc
     .lookupFunction<

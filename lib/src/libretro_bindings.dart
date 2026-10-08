@@ -166,7 +166,9 @@ class LibretroBindings {
     Platform.isMacOS || Platform.isIOS
         ? DynamicLibrary.process()
         : DynamicLibrary.open(
-            Platform.isWindows ? 'emulators.dll' : 'libemulators.so',
+            Platform.isWindows
+                ? '${File(Platform.resolvedExecutable).parent.path}\\emulators.dll'
+                : 'libemulators.so',
           ),
   );
 
