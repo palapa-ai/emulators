@@ -226,7 +226,7 @@ class _Stage extends StatelessWidget {
     final picture = _picture(context);
     final transport = _transport(context);
 
-    return showTransport || immersive
+    return showTransport
         ? _Immersive(picture: picture, transport: transport)
         : picture;
   }
