@@ -57,7 +57,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
     final skin = widget.skin;
 
     return CollapsingPanel(
-      title: 'Assistant',
+      title: 'LLM',
       trailing: [
         if (_busy)
           skin.text(context, 'thinking…', role: EmulatorTextRole.caption),
