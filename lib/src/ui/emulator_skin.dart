@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 
-import 'emulator_glyph.dart';
-import '../player_controls.dart';
 import '../emulator_button.dart';
+import '../player_controls.dart';
+import 'emulator_glyph.dart';
 
 enum EmulatorTextRole { heading, body, caption }
 

@@ -82,7 +82,7 @@ class _StyleShaderViewState extends State<StyleShaderView>
     try {
       program = await (_programs[asset] ??= ui.FragmentProgram.fromAsset(asset));
     } catch (error, stack) {
-      _programs.remove(asset);
+      unawaited(_programs.remove(asset));
       FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack, library: 'emulator display'));
       return;
     }

@@ -22,7 +22,7 @@ dependencies:
     git:
       url: https://github.com/palapa-ai/foundation.git
       path: packages/mvvm
-      ref: 0cf4fe2f51dfd94a0bc8f3c292d6fd6757a6cfc2
+      ref: 5d3a6335f373195289de5b6f152aa5a9c6db0a3a
   flutter:
     sdk: flutter
 

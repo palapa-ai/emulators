@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import '../controller_pairing.dart';
-import '../player_controls.dart';
 import '../emulator_button.dart';
+import '../player_controls.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
 
