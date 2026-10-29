@@ -5,6 +5,7 @@ import '../emulator_assistant.dart';
 import 'collapsing_panel.dart';
 import 'emulator_skin.dart';
 import 'emulator_view_model.dart';
+import 'widget_layout.dart';
 
 /// One turn of the conversation.
 class _Turn {
@@ -92,59 +93,58 @@ class _AssistantPanelState extends State<AssistantPanel> {
           if (_needsEndpoint) ...[
             Row(
               children: [
-                Expanded(
-                  child: _Field(hint: 'https://api…/v1', controller: _url),
-                ),
+                _Field(hint: 'https://api…/v1', controller: _url).expanded(),
                 const SizedBox(width: 6),
-                Expanded(
-                  child: _Field(
-                    hint: 'API key',
-                    controller: _key,
-                    obscure: true,
-                  ),
-                ),
+                _Field(
+                  hint: 'API key',
+                  controller: _key,
+                  obscure: true,
+                ).expanded(),
               ],
             ),
             const SizedBox(height: 6),
           ],
           if (_turns.isEmpty)
-            Expanded(
-              child: Column(
-                crossAxisAlignment: .stretch,
-                mainAxisAlignment: .end,
-                children: [
-                  for (final example in _examples) ...[
-                    _Example(text: example, onTap: () => _send(example)),
-                    const SizedBox(height: 6),
-                  ],
-                ],
-              ),
-            )
+            Column(
+              crossAxisAlignment: .stretch,
+              mainAxisAlignment: .start,
+              children: [
+                skin.text(context, 'Try asking:'),
+                const SizedBox(height: 6),
+                ..._examples.map(
+                  (example) => skin.button(
+                    context,
+                    label: example,
+                    icon: .controller,
+                    labelled: true,
+                    onTap: () => _send(example),
+                  ),
+                ),
+              ],
+            ).expanded()
           else
-            Expanded(
-              child: ListView.builder(
-                controller: _scroll,
-                reverse: true,
-                padding: EdgeInsets.zero,
-                itemCount: _turns.length,
-                itemBuilder: (context, i) {
-                  final turn = _turns[_turns.length - 1 - i];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: skin.measureWidth(context),
-                      ),
-                      child: skin.text(
-                        context,
-                        turn.mine ? '> ${turn.text}' : turn.text,
-                        role: turn.mine ? .body : .caption,
-                      ),
+            ListView.builder(
+              controller: _scroll,
+              reverse: true,
+              padding: EdgeInsets.zero,
+              itemCount: _turns.length,
+              itemBuilder: (context, i) {
+                final turn = _turns[_turns.length - 1 - i];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: skin.measureWidth(context),
                     ),
-                  );
-                },
-              ),
-            ),
+                    child: skin.text(
+                      context,
+                      turn.mine ? '> ${turn.text}' : turn.text,
+                      role: turn.mine ? .body : .caption,
+                    ),
+                  ),
+                );
+              },
+            ).expanded(),
           const SizedBox(height: 6),
           _Field(
             hint: 'Ask about the game…',
@@ -164,31 +164,6 @@ const _examples = [
   'frame generate to 60fps',
   'replace yoshi with wario',
 ];
-
-class _Example extends StatelessWidget {
-  const _Example({required this.text, required this.onTap});
-
-  final String text;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final skin = EmulatorTheme.of(context);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(color: skin.line(context)),
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: skin.text(context, text, role: .caption),
-      ),
-    ).clickable;
-  }
-}
 
 class _Field extends StatefulWidget {
   const _Field({
