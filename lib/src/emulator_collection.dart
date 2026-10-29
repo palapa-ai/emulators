@@ -57,7 +57,7 @@ class EmulatorCollection extends ChangeNotifier {
               2,
               3,
               resumeSlot,
-            ].any((slot) => File(statePath(rom, slot)).existsSync()),
+            ].any((slot) => rom.existingSidecar('.state$slot') != null),
           )
           .map((rom) => rom.path),
     );
@@ -200,7 +200,9 @@ class EmulatorCollection extends ChangeNotifier {
     if (!_parkPlaying()) return;
     final preview = sessionFor(rom);
     if (preview != null) _parkPreview(preview);
-    final saved = File(statePath(rom, resumeSlot));
+    final saved = File(
+      rom.existingSidecar('.state$resumeSlot') ?? statePath(rom, resumeSlot),
+    );
     Uint8List? state;
     try {
       state = saved.existsSync()

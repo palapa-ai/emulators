@@ -163,6 +163,32 @@ void main() {
     },
   );
 
+  testWidgets('aliased ROM checkpoints are resumed without previewing them', (
+    tester,
+  ) async {
+    final library = roms('aliased', 2);
+    final game = RomFile(
+      path: library.first.path,
+      title: library.first.title,
+      sizeBytes: library.first.sizeBytes,
+      aliases: [library.last.path],
+    );
+    final checkpoint = ByteData(8)
+      ..setUint32(0, 42, Endian.host)
+      ..setUint32(4, 1, Endian.host);
+    final saved = File('${library.last.path}.state5')
+      ..writeAsBytesSync(checkpoint.buffer.asUint8List());
+    final collection = EmulatorCollection(corePath: core)..setRoms([game]);
+    addTearDown(collection.dispose);
+
+    expect(collection.sessionFor(game), isNull);
+    await collection.play(game);
+
+    expect(frame(collection.session), 42);
+    expect(saved.readAsBytesSync(), checkpoint.buffer.asUint8List());
+    collection.dispose();
+  });
+
   testWidgets('an invalid resume state is preserved instead of overwritten', (
     tester,
   ) async {

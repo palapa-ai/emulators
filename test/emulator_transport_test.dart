@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:emulator_palapa/emulator_palapa.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -144,7 +145,7 @@ void main() {
   );
 
   testWidgets(
-    'a separated screen hides normal controls and retains fullscreen controls',
+    'a separated screen keeps controls hidden in fullscreen and exits with Escape',
     (tester) async {
       final temp = Directory.systemTemp.createTempSync('emulator_transport_');
       final model = _PlayingViewModel(temp.path);
@@ -169,12 +170,8 @@ void main() {
 
       model.toggleFullscreen();
       await tester.pump();
-      expect(find.byType(EmulatorTransport), findsOneWidget);
-      final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
-      await pointer.addPointer(location: Offset.zero);
-      await pointer.moveTo(tester.getCenter(find.byType(EmulatorScreen)));
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('Leave fullscreen')));
+      expect(find.byType(EmulatorTransport), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pump();
       expect(model.fullscreen, isFalse);
       expect(fullscreen, [false]);
